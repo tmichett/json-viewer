@@ -29,7 +29,7 @@ On first launch, macOS may prompt you to allow the unsigned app (right-click →
 The window has three main areas:
 
 ```
-┌─ Menu bar: File | View | Tools ─────────────────────────────┐
+┌─ Menu bar: File | View | Tools | Help ──────────────────────┐
 ├─ Editor (left) ─────────┬─ Graph canvas (right) ────────────┤
 │  Line numbers           │  Interactive node graph           │
 │  Syntax highlighting    │  Zoom slider (bottom-right)       │
@@ -218,6 +218,17 @@ Graphs with more than **1500 nodes** show an overlay instead of rendering. To wo
 
 ---
 
+## Help menu
+
+| Item | Description |
+|------|-------------|
+| **Help → Usage...** (F1) | Scrollable in-app guide — editor, graph editing, navigation, shortcuts |
+| **Help → About JSON Viewer** | Application name, version number, JSON Crack credit, license |
+
+The version shown in About matches `json_viewer.__version__` (currently **0.1.0**).
+
+---
+
 ## Themes
 
 **View → Toggle Theme** (Cmd/Ctrl+T) switches between light and dark mode.
@@ -248,6 +259,7 @@ The export captures what is visible in the graph canvas at the time of export.
 | Fit graph | Cmd+0 | Ctrl+0 |
 | Search nodes | Cmd+F | Ctrl+F |
 | Go to error | F8 | F8 |
+| Usage help | F1 | F1 |
 | Quit | Cmd+Q | Ctrl+Q |
 
 ---
