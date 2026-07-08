@@ -1,0 +1,2 @@
+[console_scripts]
+json-viewer = json_viewer.__main__:main

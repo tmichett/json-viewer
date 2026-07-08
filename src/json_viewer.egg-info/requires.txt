@@ -1,0 +1,4 @@
+PyQt6>=6.11.0
+PyYAML>=6.0.3
+defusedxml>=0.7.1
+pygments>=2.20.0

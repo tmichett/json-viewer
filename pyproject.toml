@@ -1,0 +1,35 @@
+[project]
+name = "json-viewer"
+version = "0.1.0"
+description = "Desktop JSON/YAML/XML graph visualizer inspired by JSON Crack"
+readme = "README.md"
+authors = [
+    { name = "Travis Michette", email = "tmichett@redhat.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "PyQt6>=6.11.0",
+    "PyYAML>=6.0.3",
+    "defusedxml>=0.7.1",
+    "pygments>=2.20.0",
+]
+
+[project.scripts]
+json-viewer = "json_viewer.__main__:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.0",
+    "pyinstaller>=6.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,13 +1,28 @@
+Metadata-Version: 2.4
+Name: json-viewer
+Version: 0.1.0
+Summary: Desktop JSON/YAML/XML graph visualizer inspired by JSON Crack
+Author-email: Travis Michette <tmichett@redhat.com>
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+License-File: LICENSE
+License-File: NOTICE
+Requires-Dist: PyQt6>=6.11.0
+Requires-Dist: PyYAML>=6.0.3
+Requires-Dist: defusedxml>=0.7.1
+Requires-Dist: pygments>=2.20.0
+Dynamic: license-file
+
 # JSON Viewer
 
 Desktop graph visualizer for **JSON**, **YAML**, and **XML**, inspired by [JSON Crack](https://jsoncrack.com).
+
+![JSON Viewer](docs/screenshot.png)
 
 ## Features
 
 - Split-pane editor and interactive graph canvas
 - JSON, YAML, and XML parsing with live preview
-- **View as** format switching — edit JSON and convert the editor to YAML or XML (and back) while the graph stays in sync
-- **Live linter** — syntax errors highlighted inline with line/column markers; click status or press F8 to jump to the error
 - Light and dark themes
 - Zoom, pan, fit-to-view, and focus root node
 - Collapse/expand nested objects and arrays
@@ -45,14 +60,6 @@ chmod +x scripts/build.sh
 
 On macOS the app bundle is created at `dist/JSON Viewer.app`.
 
-## Documentation
-
-| Guide | Description |
-|-------|-------------|
-| [User Guide](docs/USER_GUIDE.md) | Interface tour, workflows, shortcuts, troubleshooting |
-| [Developer Guide](docs/DEVELOPER_GUIDE.md) | Architecture, build, test, packaging |
-| [Docs index](docs/README.md) | Overview and quick links |
-
 ## Usage
 
 | Action | Shortcut |
@@ -62,9 +69,6 @@ On macOS the app bundle is created at `dist/JSON Viewer.app`.
 | Format document | Cmd/Ctrl+Shift+F |
 | Toggle theme | Cmd/Ctrl+T |
 | Toggle live transform | Cmd/Ctrl+L |
-| View as JSON / YAML / XML | View → View As menu, or status bar **View as** dropdown |
-| Validate document | Cmd/Ctrl+Shift+V |
-| Go to error | F8, or click **Invalid** in the status bar |
 | Fit graph | Cmd/Ctrl+0 |
 | Search nodes | Cmd/Ctrl+F |
 

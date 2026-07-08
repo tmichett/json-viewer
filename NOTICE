@@ -1,0 +1,6 @@
+JSON Viewer
+=============
+
+This project is inspired by [JSON Crack](https://github.com/AykutSarac/jsoncrack.com)
+by Aykut Saraç. The graph visualization algorithm and UI concepts were ported from
+the open-source `jsoncrack-react` package (Apache-2.0).
