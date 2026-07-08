@@ -11,6 +11,7 @@ Desktop graph visualizer for **JSON**, **YAML**, and **XML**, inspired by [JSON 
 - Light and dark themes
 - Zoom, pan, fit-to-view, and focus root node
 - Collapse/expand nested objects and arrays
+- **Graph editing** — add array items via schema-based forms, add object keys, edit scalar values; changes sync to the editor
 - Search nodes by key or value
 - Format/beautify documents
 - Export graph as PNG or SVG
@@ -67,13 +68,14 @@ On macOS the app bundle is created at `dist/JSON Viewer.app`.
 | Go to error | F8, or click **Invalid** in the status bar |
 | Fit graph | Cmd/Ctrl+0 |
 | Search nodes | Cmd/Ctrl+F |
+| Graph editing | Click **+** on array rows, **+ Add key** on objects, or click scalar values |
 
 ## Project structure
 
 ```
 src/json_viewer/
   adapters/     # JSON, YAML, XML parse/format
-  graph/        # Parser, layout, collapse logic
+  graph/        # Parser, layout, collapse, data_edit, schema
   ui/           # PyQt6 widgets
   export/       # PNG/SVG export
 ```

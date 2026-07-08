@@ -6,7 +6,7 @@ Documentation for the **JSON Viewer** desktop application — a PyQt6 graph visu
 
 | Document | Audience | Description |
 |----------|----------|-------------|
-| [User Guide](USER_GUIDE.md) | End users | Interface tour, workflows, shortcuts, troubleshooting |
+| [User Guide](USER_GUIDE.md) | End users | Interface tour, graph editing, workflows, shortcuts, troubleshooting |
 | [Developer Guide](DEVELOPER_GUIDE.md) | Contributors | Architecture, build, test, packaging |
 
 ## Quick start

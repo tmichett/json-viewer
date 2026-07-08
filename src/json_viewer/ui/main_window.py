@@ -20,10 +20,14 @@ from PyQt6.QtWidgets import (
 from json_viewer.adapters.base import convert_content, format_content, parse_content
 from json_viewer.adapters.types import DataFormat
 from json_viewer.export.image_export import export_png, export_svg
+from json_viewer.graph.data_edit import add_array_item, add_object_key, get_at_path, set_value_at_path
+from json_viewer.graph.models import JSONPath
 from json_viewer.graph.parser import graph_data_from_result, parse_graph_from_data
+from json_viewer.graph.schema import infer_array_item_schema
 from json_viewer.lint.linter import lint_content
 from json_viewer.ui.editor import CodeEditor
 from json_viewer.ui.graph_canvas import GraphCanvas
+from json_viewer.ui.graph_edit_dialog import AddArrayItemDialog, AddKeyDialog, AddScalarItemDialog, EditValueDialog
 from json_viewer.ui.search_bar import SearchBar
 from json_viewer.ui.theme import ThemeManager, ThemeMode
 from json_viewer.ui.toolbar import GraphToolbar
@@ -153,6 +157,9 @@ class MainWindow(QMainWindow):
         self._search_bar.next_match.connect(self._graph.next_search_match)
         self._search_bar.prev_match.connect(self._graph.prev_search_match)
         self._graph.search_matches_changed.connect(self._search_bar.set_match_count)
+        self._graph.add_array_item.connect(self._on_graph_add_array_item)
+        self._graph.add_object_key.connect(self._on_graph_add_object_key)
+        self._graph.edit_scalar.connect(self._on_graph_edit_scalar)
 
         self._editor.set_data_format(self._view_format)
         self._sync_view_format_combo()
@@ -404,6 +411,128 @@ class MainWindow(QMainWindow):
         graph = graph_data_from_result(graph_result)
         self._graph.set_graph(graph)
         self._status_nodes.setText(f"Nodes: {len(graph.nodes)}")
+
+    def _current_parsed_data(self):
+        text = self._editor.toPlainText()
+        result = parse_content(text, self._view_format)
+        if result.errors:
+            QMessageBox.warning(self, "Edit Error", result.errors[0].message)
+            return None
+        return result.data
+
+    def _apply_data(self, data, *, expand_paths: list[JSONPath] | None = None) -> None:
+        formatted = format_content(data, self._view_format)
+        self._converting = True
+        self._editor.setPlainText(formatted)
+        self._converting = False
+        self._dirty = True
+        self._update_title()
+        self._run_lint()
+        self._refresh_graph()
+        if expand_paths:
+            for path in expand_paths:
+                self._graph.expand_path(path)
+
+    def _on_graph_add_array_item(self, path: JSONPath) -> None:
+        data = self._current_parsed_data()
+        if data is None:
+            return
+
+        try:
+            array = get_at_path(data, path)
+        except (TypeError, KeyError, IndexError) as exc:
+            QMessageBox.warning(self, "Add Item", str(exc))
+            return
+
+        if not isinstance(array, list):
+            QMessageBox.warning(self, "Add Item", "Target is not an array.")
+            return
+
+        item = self._prompt_array_item(array, path)
+        if item is None:
+            return
+
+        try:
+            updated = add_array_item(data, path, item)
+        except (TypeError, KeyError, IndexError) as exc:
+            QMessageBox.warning(self, "Add Item", str(exc))
+            return
+        self._apply_data(updated, expand_paths=[path])
+
+    def _prompt_array_item(self, array: list, path: JSONPath):
+        title, subtitle = self._array_item_dialog_labels(path)
+        schema = infer_array_item_schema(array)
+
+        if schema and schema.value_type == "object" and schema.children:
+            dialog = AddArrayItemDialog(schema, title=title, subtitle=subtitle, parent=self)
+            if dialog.exec() != dialog.DialogCode.Accepted:
+                return None
+            return dialog.parsed_item()
+
+        if schema and schema.value_type in ("string", "number", "boolean", "null"):
+            dialog = AddScalarItemDialog(schema.value_type, title=title, parent=self)
+            if dialog.exec() != dialog.DialogCode.Accepted:
+                return None
+            return dialog.parsed_item()
+
+        return {}
+
+    def _array_item_dialog_labels(self, path: JSONPath) -> tuple[str, str]:
+        label = str(path[-1]) if path else "item"
+        if label.endswith("s") and len(label) > 1:
+            singular = label[:-1]
+            title = f"Add {singular.title()}"
+        else:
+            title = f"Add {label.title()}"
+        subtitle = (
+            f"Fields are based on existing items in {label}."
+            if path
+            else "Fields are based on existing items in this array."
+        )
+        return title, subtitle
+
+    def _on_graph_add_object_key(self, path: JSONPath) -> None:
+        data = self._current_parsed_data()
+        if data is None:
+            return
+
+        dialog = AddKeyDialog(self)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+
+        key, value = dialog.result_key_value()
+        try:
+            updated = add_object_key(data, path, key, value)
+        except (TypeError, KeyError, IndexError) as exc:
+            QMessageBox.warning(self, "Add Key", str(exc))
+            return
+
+        if updated is None:
+            QMessageBox.warning(self, "Add Key", f'Key "{key}" already exists.')
+            return
+
+        expand = [path]
+        if isinstance(value, dict):
+            expand.append((*path, key))
+        self._apply_data(updated, expand_paths=expand)
+
+    def _on_graph_edit_scalar(self, path: JSONPath, value: object, value_type: str) -> None:
+        data = self._current_parsed_data()
+        if data is None:
+            return
+
+        key = str(path[-1]) if path else None
+        dialog = EditValueDialog(key, value, value_type, self)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+
+        try:
+            updated = set_value_at_path(data, path, dialog.parsed_value())
+        except (TypeError, KeyError, IndexError, ValueError) as exc:
+            QMessageBox.warning(self, "Edit Value", str(exc))
+            return
+
+        self._apply_data(updated)
 
     def _format_document(self) -> None:
         text = self._editor.toPlainText()

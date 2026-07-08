@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 from typing import Callable
 
-from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
+from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPainterPath, QPen
-from PyQt6.QtWidgets import QGraphicsItem, QGraphicsRectItem, QGraphicsScene, QStyleOptionGraphicsItem, QWidget
+from PyQt6.QtWidgets import QGraphicsItem, QGraphicsRectItem, QStyleOptionGraphicsItem, QWidget
 
 from json_viewer.graph.collapse import path_key
 from json_viewer.graph.models import EdgeData, JSONPath, NodeData, NodeRow
@@ -14,26 +14,69 @@ from json_viewer.ui.theme import ThemeManager
 HEX_PATTERN = re.compile(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")
 ROW_HEIGHT = 30
 PADDING_X = 10
+ADD_BUTTON_WIDTH = 22
+
+
+def is_object_node(node: NodeData) -> bool:
+    if not node.text:
+        return False
+    first = node.text[0]
+    if first.key is not None:
+        return True
+    return first.type == "object" and first.children_count is not None
+
+
+def is_root_array_node(node: NodeData) -> bool:
+    return (
+        len(node.text) == 1
+        and node.text[0].key is None
+        and node.text[0].type == "array"
+    )
+
+
+def object_path(node: NodeData) -> JSONPath:
+    return node.path
+
+
+def array_row_path(node: NodeData, row: NodeRow) -> JSONPath:
+    if row.key is None:
+        return node.path
+    return (*node.path, row.key)
 
 
 class NodeGraphicsItem(QGraphicsRectItem):
-    collapse_toggled = pyqtSignal(object)  # JSONPath
-
     def __init__(
         self,
         node: NodeData,
         theme_manager: ThemeManager,
         collapsed: set[str],
         on_collapse: Callable[[JSONPath], None] | None = None,
+        on_add_array_item: Callable[[JSONPath], None] | None = None,
+        on_add_object_key: Callable[[JSONPath], None] | None = None,
+        on_edit_scalar: Callable[[JSONPath, object, str], None] | None = None,
     ) -> None:
-        super().__init__(0, 0, node.width, node.height)
+        extra_rows = self._extra_row_count(node)
+        height = node.height + extra_rows * ROW_HEIGHT
+        super().__init__(0, 0, node.width, height)
         self.node = node
         self._theme = theme_manager
         self._collapsed = collapsed
         self._on_collapse = on_collapse
+        self._on_add_array_item = on_add_array_item
+        self._on_add_object_key = on_add_object_key
+        self._on_edit_scalar = on_edit_scalar
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setAcceptHoverEvents(True)
         self._hovered = False
+        self._hovered_add: str | None = None
+
+    def _extra_row_count(self, node: NodeData) -> int:
+        count = 0
+        if is_object_node(node):
+            count += 1
+        if is_root_array_node(node):
+            count += 1
+        return count
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget | None = None) -> None:
         colors = self._theme.colors
@@ -59,6 +102,24 @@ class NodeGraphicsItem(QGraphicsRectItem):
         for index, row in enumerate(self.node.text):
             self._paint_row(painter, row, y, index)
             y += ROW_HEIGHT
+
+        if is_object_node(self.node):
+            self._paint_add_row(painter, y, "object", "+ Add key")
+            y += ROW_HEIGHT
+
+        if is_root_array_node(self.node):
+            self._paint_add_row(painter, y, "root_array", "+ Add item")
+
+    def _paint_add_row(self, painter: QPainter, y: float, kind: str, label: str) -> None:
+        colors = self._theme.colors
+        hovered = self._hovered_add == kind
+        color = QColor(colors.status_valid if hovered else colors.highlight)
+        painter.setPen(color)
+        painter.drawText(
+            QRectF(PADDING_X, y, self.rect().width() - PADDING_X * 2, ROW_HEIGHT),
+            Qt.AlignmentFlag.AlignVCenter,
+            label,
+        )
 
     def _paint_row(self, painter: QPainter, row: NodeRow, y: float, index: int) -> None:
         colors = self._theme.colors
@@ -86,13 +147,34 @@ class NodeGraphicsItem(QGraphicsRectItem):
 
         display = self._row_display(row, collapsed)
         painter.setPen(QColor(self._theme.value_color(row.value, row.type)))
-        painter.drawText(QRectF(x, y, self.rect().width() - x, ROW_HEIGHT), Qt.AlignmentFlag.AlignVCenter, display)
+        painter.drawText(
+            QRectF(x, y, self.rect().width() - x - ADD_BUTTON_WIDTH - 4, ROW_HEIGHT),
+            Qt.AlignmentFlag.AlignVCenter,
+            display,
+        )
 
         if isinstance(display, str) and HEX_PATTERN.match(display.strip()):
             swatch_x = x + painter.fontMetrics().horizontalAdvance(display) + 6
             painter.setBrush(QBrush(QColor(display.strip())))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(QPointF(swatch_x + 6, y + ROW_HEIGHT / 2), 6, 6)
+
+        if row.type == "array":
+            self._paint_array_add_button(painter, y, index)
+
+    def _paint_array_add_button(self, painter: QPainter, y: float, index: int) -> None:
+        colors = self._theme.colors
+        btn_rect = self._array_add_rect(y)
+        hovered = self._hovered_add == f"array:{index}"
+        painter.setPen(QColor(colors.status_valid if hovered else colors.highlight))
+        painter.drawText(btn_rect, Qt.AlignmentFlag.AlignCenter, "+")
+
+    def _array_add_rect(self, y: float) -> QRectF:
+        return QRectF(self.rect().width() - ADD_BUTTON_WIDTH - 4, y, ADD_BUTTON_WIDTH, ROW_HEIGHT)
+
+    def _add_row_rect(self, row_index: int) -> QRectF:
+        y = PADDING_X + row_index * ROW_HEIGHT
+        return QRectF(PADDING_X, y, self.rect().width() - PADDING_X * 2, ROW_HEIGHT)
 
     def _row_display(self, row: NodeRow, collapsed: bool) -> str:
         if row.type == "object":
@@ -105,6 +187,18 @@ class NodeGraphicsItem(QGraphicsRectItem):
             return "null"
         return str(row.value)
 
+    def hoverMoveEvent(self, event) -> None:
+        prev = self._hovered_add
+        self._hovered_add = self._hit_add_target(event.pos())
+        if prev != self._hovered_add:
+            self.setCursor(
+                Qt.CursorShape.PointingHandCursor
+                if self._hovered_add
+                else Qt.CursorShape.ArrowCursor
+            )
+            self.update()
+        super().hoverMoveEvent(event)
+
     def hoverEnterEvent(self, event) -> None:
         self._hovered = True
         self.update()
@@ -112,12 +206,49 @@ class NodeGraphicsItem(QGraphicsRectItem):
 
     def hoverLeaveEvent(self, event) -> None:
         self._hovered = False
+        self._hovered_add = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
         self.update()
         super().hoverLeaveEvent(event)
+
+    def _hit_add_target(self, pos) -> str | None:
+        y = pos.y()
+
+        for index, row in enumerate(self.node.text):
+            row_y = PADDING_X + index * ROW_HEIGHT
+            if row_y <= y < row_y + ROW_HEIGHT:
+                if row.type == "array" and self._array_add_rect(row_y).contains(pos):
+                    return f"array:{index}"
+                return None
+
+        row_index = len(self.node.text)
+        if is_object_node(self.node):
+            if self._add_row_rect(row_index).contains(pos):
+                return "object"
+            row_index += 1
+
+        if is_root_array_node(self.node):
+            if self._add_row_rect(row_index).contains(pos):
+                return "root_array"
+
+        return None
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             pos = event.pos()
+            add_target = self._hit_add_target(pos)
+            if add_target:
+                if add_target == "object" and self._on_add_object_key:
+                    self._on_add_object_key(object_path(self.node))
+                elif add_target == "root_array" and self._on_add_array_item:
+                    self._on_add_array_item(self.node.path)
+                elif add_target.startswith("array:") and self._on_add_array_item:
+                    index = int(add_target.split(":")[1])
+                    row = self.node.text[index]
+                    self._on_add_array_item(array_row_path(self.node, row))
+                event.accept()
+                return
+
             row_index = int((pos.y() - PADDING_X) / ROW_HEIGHT)
             if 0 <= row_index < len(self.node.text):
                 row = self.node.text[row_index]
@@ -130,6 +261,13 @@ class NodeGraphicsItem(QGraphicsRectItem):
                         self._on_collapse(row_path)
                         event.accept()
                         return
+
+                if row.type not in ("object", "array") and row.key is not None and self._on_edit_scalar:
+                    value_path = (*self.node.path, row.key)
+                    self._on_edit_scalar(value_path, row.value, row.type)
+                    event.accept()
+                    return
+
         super().mousePressEvent(event)
 
 

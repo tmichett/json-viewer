@@ -49,6 +49,9 @@ class GridScene(QGraphicsScene):
 
 class GraphCanvas(QGraphicsView):
     search_matches_changed = pyqtSignal(int)
+    add_array_item = pyqtSignal(object)  # JSONPath
+    add_object_key = pyqtSignal(object)  # JSONPath
+    edit_scalar = pyqtSignal(object, object, str)  # JSONPath, value, type
 
     def __init__(self, theme_manager: ThemeManager, parent=None) -> None:
         super().__init__(parent)
@@ -111,6 +114,12 @@ class GraphCanvas(QGraphicsView):
             self._collapsed.add(key)
         self._rebuild_scene()
 
+    def expand_path(self, path: JSONPath) -> None:
+        key = path_key(path)
+        if key in self._collapsed:
+            self._collapsed.discard(key)
+            self._rebuild_scene()
+
     def collapse_all(self) -> None:
         if not self._graph:
             return
@@ -149,7 +158,15 @@ class GraphCanvas(QGraphicsView):
 
         for node in filtered.nodes:
             pos = layout.positions.get(node.id, (0.0, 0.0))
-            item = NodeGraphicsItem(node, self._theme, self._collapsed, self.toggle_collapse)
+            item = NodeGraphicsItem(
+                node,
+                self._theme,
+                self._collapsed,
+                self.toggle_collapse,
+                on_add_array_item=self.add_array_item.emit,
+                on_add_object_key=self.add_object_key.emit,
+                on_edit_scalar=self.edit_scalar.emit,
+            )
             item.setPos(pos[0], pos[1])
             self._scene.addItem(item)
             self._node_items[node.id] = item

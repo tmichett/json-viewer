@@ -30,10 +30,23 @@ Supports <b>JSON</b>, <b>YAML</b>, and <b>XML</b>. All processing happens locall
   <li><b>Tools → Format Document</b> beautifies the current document</li>
 </ul>
 
-<h3>Graph</h3>
+<h3>Graph editing</h3>
+<p>You can add and change data on the graph without editing the raw text. Changes sync to the editor automatically.</p>
+<ul>
+  <li><b>Add array item</b> — click the blue <b>+</b> on the right of an array row (e.g. <code>fruits: [3 items]</code>).
+      A form opens with fields based on existing items (like a database record view).
+      Nested groups (e.g. <code>details</code>, <code>nutrients</code>) appear as labeled sections.</li>
+  <li><b>Add object key</b> — click <b>+ Add key</b> at the bottom of any object node.
+      Enter the key name, type, and value in the dialog.</li>
+  <li><b>Edit a value</b> — click any scalar row (string, number, boolean, null) on a node to edit it.</li>
+</ul>
+<p><b>Note:</b> The <b>+ / −</b> on the <i>left</i> of a row collapses or expands children.
+The blue <b>+</b> on the <i>right</i> of an array row adds a new item.</p>
+
+<h3>Graph navigation</h3>
 <ul>
   <li>Drag to pan; <b>Ctrl+scroll</b> or the zoom slider to zoom</li>
-  <li>Click <b>{N keys}</b> or <b>[N items]</b> on a node to collapse or expand that section</li>
+  <li>Click <b>− / +</b> on the left of <b>{N keys}</b> or <b>[N items]</b> to collapse or expand</li>
   <li>Search nodes by key or value in the search bar below the graph</li>
   <li>Use <b>− + Fit Root</b> on the toolbar to zoom and navigate</li>
   <li>Export the graph as PNG or SVG from the File menu</li>
@@ -56,6 +69,8 @@ Supports <b>JSON</b>, <b>YAML</b>, and <b>XML</b>. All processing happens locall
 <ul>
   <li>Graphs with more than 1500 nodes show a limit warning — collapse large sections to continue</li>
   <li>Toggle <b>View → Toggle Theme</b> for light or dark mode</li>
+  <li>Empty arrays have no template to copy — a blank <code>{}</code> is added; use <b>+ Add key</b> to build it up</li>
+  <li>To add one extra field to an existing object, use <b>+ Add key</b> instead of adding a whole new array item</li>
 </ul>
 """
 
@@ -75,7 +90,7 @@ def show_about(parent) -> None:
 def show_usage_help(parent) -> None:
     dialog = QDialog(parent)
     dialog.setWindowTitle("JSON Viewer — Usage")
-    dialog.resize(560, 520)
+    dialog.resize(560, 580)
 
     browser = QTextBrowser(dialog)
     browser.setOpenExternalLinks(True)
