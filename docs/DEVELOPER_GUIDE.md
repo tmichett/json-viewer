@@ -33,7 +33,7 @@ json-viewer/
 | YAML | PyYAML | `safe_load` / `dump` |
 | XML | defusedxml + ElementTree | Safe parsing; `$attr` prefix convention |
 | Packaging | PyInstaller 6.x | `collect_all('PyQt6')` for Qt deps |
-| Tests | pytest | 45+ tests |
+| Tests | pytest | 59 tests |
 
 ## Architecture
 
@@ -77,6 +77,26 @@ Graph edits flow through `MainWindow`: the canvas emits signals, `data_edit` mut
 **Edit scalar flow:** `EditValueDialog` → `set_value_at_path()` → editor sync.
 
 When programmatically updating the editor after a graph edit, set `_converting = True` to avoid dirty/lint churn (same pattern as format conversion).
+
+### Table preview
+
+| Module | Role |
+|--------|------|
+| `graph/table_data.py` | Discovers arrays, builds relational sections (main + child tables), cell paths |
+| `ui/table_view.py` | Stacked `QTableView` sections, **+ Dataset**, **+ Add row** |
+| `ui/main_window.py` | `QStackedWidget` graph/table preview; table edit and add handlers |
+
+**Relational layout:** main table with detected primary key first (`name`), top-level scalars next, then one child table per nested object (`details`, `nutrients`) linked via a read-only FK column.
+
+**Field order:** `FieldSchema.child_order` preserves first-seen key order from sample dicts. Used by `AddArrayItemDialog` and `build_relational_tables()` column ordering — never sort alphabetically.
+
+**Add row flow:** `TableView` → `MainWindow._on_table_add_row` → reuses `_add_array_item_at_path()` / `AddArrayItemDialog`.
+
+**Add dataset flow:** `AddDatasetDialog` → `add_object_key(data, (), name, [])` for a new top-level array.
+
+**Table edit flow:** double-click cell → `set_value_at_path` → editor refresh.
+
+**Gotcha:** `_ArrayTableModel` must copy `section.columns` and `section.rows` in `__init__` or tables render empty headers with no data.
 
 ### Graph parser
 
@@ -162,6 +182,8 @@ Output on macOS: `dist/JSON Viewer.app`
 | `test_data_edit.py` | Path mutations (`add_array_item`, `add_object_key`, `set_value_at_path`) |
 | `test_schema.py` | Schema inference and form-to-object building |
 | `test_graph_items.py` | Graph item helpers (object/array node detection, paths) |
+| `test_table_data.py` | Relational table discovery, column order, cell paths |
+| `test_table_view.py` | Table view widget smoke tests |
 
 Run before committing:
 

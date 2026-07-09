@@ -29,7 +29,13 @@ from json_viewer.graph.table_data import TableColumn, TableTarget, cell_path
 from json_viewer.lint.linter import lint_content
 from json_viewer.ui.editor import CodeEditor
 from json_viewer.ui.graph_canvas import GraphCanvas
-from json_viewer.ui.graph_edit_dialog import AddArrayItemDialog, AddKeyDialog, AddScalarItemDialog, EditValueDialog
+from json_viewer.ui.graph_edit_dialog import (
+    AddArrayItemDialog,
+    AddDatasetDialog,
+    AddKeyDialog,
+    AddScalarItemDialog,
+    EditValueDialog,
+)
 from json_viewer.ui.search_bar import SearchBar
 from json_viewer.ui.theme import ThemeManager, ThemeMode
 from json_viewer.ui.table_view import DataTableView
@@ -176,6 +182,8 @@ class MainWindow(QMainWindow):
         self._graph.add_object_key.connect(self._on_graph_add_object_key)
         self._graph.edit_scalar.connect(self._on_graph_edit_scalar)
         self._table_view.cell_edited.connect(self._on_table_cell_edited)
+        self._table_view.add_dataset_requested.connect(self._on_table_add_dataset)
+        self._table_view.add_row_requested.connect(self._on_table_add_row)
 
         self._editor.set_data_format(self._view_format)
         self._sync_view_format_combo()
@@ -505,7 +513,13 @@ class MainWindow(QMainWindow):
             return None
         return result.data
 
-    def _apply_data(self, data, *, expand_paths: list[JSONPath] | None = None) -> None:
+    def _apply_data(
+        self,
+        data,
+        *,
+        expand_paths: list[JSONPath] | None = None,
+        table_path: JSONPath | None = None,
+    ) -> None:
         formatted = format_content(data, self._view_format)
         self._converting = True
         self._editor.setPlainText(formatted)
@@ -514,11 +528,55 @@ class MainWindow(QMainWindow):
         self._update_title()
         self._run_lint()
         self._refresh_preview()
+        if table_path is not None:
+            self._table_view.set_data(data, preferred_path=table_path)
         if expand_paths:
             for path in expand_paths:
                 self._graph.expand_path(path)
 
+    def _on_table_add_dataset(self) -> None:
+        data = self._current_parsed_data()
+        if data is None:
+            return
+        if not isinstance(data, dict):
+            QMessageBox.warning(
+                self,
+                "Add Dataset",
+                "The document root must be a JSON object to add top-level datasets.",
+            )
+            return
+
+        dialog = AddDatasetDialog(self)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+
+        name = dialog.dataset_name()
+        if name in data:
+            QMessageBox.warning(self, "Add Dataset", f'Dataset "{name}" already exists.')
+            return
+
+        try:
+            updated = add_object_key(data, (), name, [])
+        except (TypeError, KeyError, IndexError) as exc:
+            QMessageBox.warning(self, "Add Dataset", str(exc))
+            return
+
+        if updated is None:
+            QMessageBox.warning(self, "Add Dataset", f'Dataset "{name}" already exists.')
+            return
+
+        self._apply_data(updated, table_path=(name,))
+
+    def _on_table_add_row(self) -> None:
+        target = self._table_view.current_target()
+        if target is None:
+            return
+        self._add_array_item_at_path(target.path)
+
     def _on_graph_add_array_item(self, path: JSONPath) -> None:
+        self._add_array_item_at_path(path)
+
+    def _add_array_item_at_path(self, path: JSONPath) -> None:
         data = self._current_parsed_data()
         if data is None:
             return
@@ -542,7 +600,7 @@ class MainWindow(QMainWindow):
         except (TypeError, KeyError, IndexError) as exc:
             QMessageBox.warning(self, "Add Item", str(exc))
             return
-        self._apply_data(updated, expand_paths=[path])
+        self._apply_data(updated, expand_paths=[path], table_path=path)
 
     def _prompt_array_item(self, array: list, path: JSONPath):
         title, subtitle = self._array_item_dialog_labels(path)

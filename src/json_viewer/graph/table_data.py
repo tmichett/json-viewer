@@ -54,6 +54,10 @@ class TableData:
     rows: list[list[Any]]
 
 
+def can_add_top_level_dataset(data: Any) -> bool:
+    return isinstance(data, dict)
+
+
 def path_label(path: JSONPath) -> str:
     if not path:
         return "[root]"
@@ -144,28 +148,46 @@ def _detect_primary_key(items: list[dict[str, Any]]) -> str:
     return "name"
 
 
-def _collect_top_level_scalar_keys(items: list[dict[str, Any]], primary_key: str) -> list[str]:
-    keys: set[str] = set()
+def _merge_key_order(
+    items: list[dict[str, Any]],
+    *,
+    include_key,
+) -> list[str]:
+    order: list[str] = []
+    seen: set[str] = set()
     for item in items:
         for key, value in item.items():
-            if key == primary_key:
+            if key in seen or not include_key(key, value):
                 continue
-            if _is_scalar(value):
-                keys.add(key)
-    return sorted(keys)
+            order.append(key)
+            seen.add(key)
+    return order
+
+
+def _collect_top_level_scalar_keys(items: list[dict[str, Any]], primary_key: str) -> list[str]:
+    return _merge_key_order(
+        items,
+        include_key=lambda key, value: key != primary_key and _is_scalar(value),
+    )
 
 
 def _collect_nested_object_keys(items: list[dict[str, Any]]) -> list[str]:
-    keys: set[str] = set()
+    return _merge_key_order(items, include_key=lambda _key, value: isinstance(value, dict))
+
+
+def _nested_scalar_key_order(items: list[dict[str, Any]], child_field: str) -> list[str]:
+    order: list[str] = []
+    seen: set[str] = set()
     for item in items:
-        for key, value in item.items():
-            if isinstance(value, dict):
-                keys.add(key)
-    return sorted(keys)
-
-
-def _nested_scalar_keys(nested: dict[str, Any]) -> list[str]:
-    return sorted(key for key, value in nested.items() if _is_scalar(value))
+        nested = item.get(child_field)
+        if not isinstance(nested, dict):
+            continue
+        for key, value in nested.items():
+            if key in seen or not _is_scalar(value):
+                continue
+            order.append(key)
+            seen.add(key)
+    return order
 
 
 def _column_for_field(key: str, sample: Any, *, primary_key: bool = False, foreign_key: bool = False) -> TableColumn:
@@ -216,13 +238,9 @@ def build_relational_tables(data: Any, target: TableTarget) -> RelationalTableSe
                 read_only=True,
             )
         ]
-        child_scalar_keys: set[str] = set()
-        for item in dict_items:
-            nested = item.get(child_field)
-            if isinstance(nested, dict):
-                child_scalar_keys.update(_nested_scalar_keys(nested))
+        child_scalar_keys = _nested_scalar_key_order(dict_items, child_field)
 
-        for key in sorted(child_scalar_keys):
+        for key in child_scalar_keys:
             sample = _sample_nested_value(dict_items, child_field, key)
             child_columns.append(
                 TableColumn(
@@ -236,7 +254,7 @@ def build_relational_tables(data: Any, target: TableTarget) -> RelationalTableSe
         for item in dict_items:
             nested = item.get(child_field) if isinstance(item.get(child_field), dict) else {}
             row = [item.get(primary_key)]
-            row.extend(nested.get(key) if isinstance(nested, dict) else None for key in sorted(child_scalar_keys))
+            row.extend(nested.get(key) if isinstance(nested, dict) else None for key in child_scalar_keys)
             child_rows.append(row)
 
         sections.append(

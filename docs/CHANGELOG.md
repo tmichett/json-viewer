@@ -4,6 +4,25 @@ All notable changes to JSON Viewer. Version follows `src/json_viewer/__init__.py
 
 ## Branch: `feat-add-items` (ahead of `main`)
 
+### Table add controls + field order (working tree)
+
+**Added**
+
+- **+ Dataset** — create a new top-level array on the JSON root (e.g. `vegetables` alongside `fruits`)
+- **+ Add row** — on the main table only; opens the same schema form as graph **+** on an array
+- **`template_object_from_sample()`** — new array items get nested `{}` shells matching sibling structure
+- **JSON key order** — add-item forms and table columns preserve document key order via `FieldSchema.child_order` (not alphabetical)
+
+**Changed**
+
+- `graph/schema.py` — `child_order` list on `FieldSchema`; first-seen key order from sample dicts
+- `graph/table_data.py` — column order follows document order (PK first, then sibling keys)
+- `ui/graph_edit_dialog.py` — form fields iterate `child_order`
+- `ui/table_view.py`, `ui/main_window.py` — dataset/row add wiring
+- Tests: 59 total (`test_schema.py`, `test_table_data.py`, `test_data_edit.py`)
+
+---
+
 ### Table preview (`1a90461`)
 
 **Added**
@@ -14,7 +33,7 @@ All notable changes to JSON Viewer. Version follows `src/json_viewer/__init__.py
 - **Editable cells** — double-click to edit; FK columns read-only; syncs via `set_value_at_path`
 - **View → Graph / Table Preview** — Ctrl+Shift+G / Ctrl+Shift+T; status bar **Preview** dropdown
 - Modules: `graph/table_data.py`, `ui/table_view.py`
-- Tests: `test_table_data.py`, `test_table_view.py` (57 tests total)
+- Tests: `test_table_data.py`, `test_table_view.py` (59 tests total on branch)
 
 **Fixed**
 

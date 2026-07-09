@@ -62,14 +62,14 @@ class TestTableData:
         assert details.foreign_key == "name"
         assert details.columns[0].is_foreign_key
         assert details.columns[0].read_only
-        assert [c.header for c in details.columns[1:]] == ["season", "type"]
+        assert [c.header for c in details.columns[1:]] == ["type", "season"]
 
         nutrients = result.sections[2]
         assert [c.header for c in nutrients.columns[1:]] == [
             "calories",
             "fiber",
-            "potassium",
             "vitaminC",
+            "potassium",
         ]
 
     def test_relational_row_values(self):
@@ -82,8 +82,10 @@ class TestTableData:
 
         details = result.sections[1]
         assert details.rows[0][0] == "Apple"
-        assert details.rows[0][1] == "Fall"
-        assert details.rows[1][2] == "Berry"
+        assert details.rows[0][1] == "Pome"
+        assert details.rows[0][2] == "Fall"
+        assert details.rows[1][1] == "Berry"
+        assert details.rows[1][2] == "Year-round"
 
     def test_cell_path_main_and_child(self):
         target = discover_table_targets(FRUITS_DOC)[0]
@@ -92,7 +94,7 @@ class TestTableData:
         main = result.sections[0]
         details = result.sections[1]
         name_col = main.columns[0]
-        season_col = details.columns[1]
+        season_col = details.columns[2]
         assert cell_path(target, main, 1, name_col) == ("fruits", 1, "name")
         assert cell_path(target, details, 0, season_col) == ("fruits", 0, "details", "season")
 
@@ -120,11 +122,16 @@ class TestTableData:
         assert path_label(("fruits",)) == "fruits"
         assert path_label(()) == "[root]"
 
-    def test_nested_arrays_discovered(self):
-        doc = {"data": {"items": [{"id": 1}], "labels": ["x"]}}
+    def test_can_add_top_level_dataset(self):
+        from json_viewer.graph.table_data import can_add_top_level_dataset
+
+        assert can_add_top_level_dataset({"fruits": []})
+        assert not can_add_top_level_dataset([{"name": "x"}])
+
+    def test_discover_multiple_top_level_datasets(self):
+        doc = {"fruits": [{"name": "Apple"}], "vegetables": [{"name": "Carrot"}]}
         labels = {t.label for t in discover_table_targets(doc)}
-        assert "data.items" in labels
-        assert "data.labels" in labels
+        assert labels == {"fruits", "vegetables"}
 
     def test_primary_key_prefers_id(self):
         doc = {

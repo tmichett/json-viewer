@@ -16,6 +16,9 @@ def get_at_path(data: Any, path: JSONPath) -> Any:
 def _default_array_item(existing: list[Any]) -> Any:
     if not existing:
         return {}
+    sample = next((item for item in existing if isinstance(item, dict) and item), None)
+    if isinstance(sample, dict):
+        return template_object_from_sample(sample)
     sample = existing[0]
     if isinstance(sample, dict):
         return {}
@@ -28,6 +31,27 @@ def _default_array_item(existing: list[Any]) -> Any:
     if isinstance(sample, (int, float)):
         return 0
     return {}
+
+
+def template_object_from_sample(sample: dict[str, Any]) -> dict[str, Any]:
+    """Build an empty object with the same nested shape as an existing item."""
+    result: dict[str, Any] = {}
+    for key, value in sample.items():
+        if isinstance(value, dict):
+            result[key] = {}
+        elif isinstance(value, list):
+            result[key] = []
+        elif value is None:
+            result[key] = None
+        elif isinstance(value, bool):
+            result[key] = False
+        elif isinstance(value, (int, float)):
+            result[key] = 0
+        elif isinstance(value, str):
+            result[key] = ""
+        else:
+            result[key] = {}
+    return result
 
 
 def add_array_item(data: Any, path: JSONPath, item: Any | None = None) -> Any:

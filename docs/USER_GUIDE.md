@@ -157,10 +157,21 @@ The table view organizes data like a **relational database**, not one wide flat 
 - **Related tables** (e.g. `details`, `nutrients`) — one per nested object, linked back via the primary key (`name →`)
 - Foreign key columns in child tables are read-only; edit the main table to change the key
 - Scalar arrays (e.g. `["a", "b"]`) still show a single **value** column
+- **Field order** — form fields and table columns follow the key order in your JSON document (e.g. `name`, `color`, then `details`, `nutrients`), not alphabetical order
 
 ### Edit cells
 
 Double-click any cell to edit. Changes sync to the text editor immediately and mark the document as unsaved.
+
+### Add a dataset
+
+Click **+ Dataset** in the table header (or on the empty state) to create a new top-level array — e.g. `vegetables` alongside `fruits`. Enter a name; an empty array is added to the JSON root. Switch to it in the **Dataset** dropdown, then use **+ Add row** to populate it.
+
+### Add rows to a dataset
+
+On the **main table** (e.g. `fruits`), click **+ Add row** below the grid. This opens the same schema-based form as graph **+** on an array — fill in `name`, `color`, `details`, `nutrients`, etc. for a new item like Grapes.
+
+Child tables (`details`, `nutrients`) do not have their own add-row button — rows are tied to the main table. Add a row on `fruits`, then fill in child table cells.
 
 ---
 
@@ -199,7 +210,7 @@ You can add and change data directly on the graph without editing raw JSON. Chan
 2. Click the blue **+** on the right side of that row
 3. A form opens with fields inferred from existing items in the array
 
-For object arrays (like the sample `fruits` data), the form shows all top-level keys and nested groups (`details`, `nutrients`, etc.). Keys are merged across siblings — if one fruit has `vitaminC` and another has `potassium`, both appear in the form.
+For object arrays (like the sample `fruits` data), the form shows all top-level keys and nested groups (`details`, `nutrients`, etc.) in **JSON key order** — e.g. `name`, `color`, then nested groups. Keys are merged across siblings — if one fruit has `vitaminC` and another has `potassium`, both appear in the form.
 
 4. Fill in the fields and click **OK** — the new item is added with full structure
 

@@ -187,7 +187,7 @@ class AddArrayItemDialog(QDialog):
         if schema.value_type != "object":
             return
 
-        for key in sorted(schema.children):
+        for key in schema.child_order or sorted(schema.children):
             child = schema.children[key]
             child_prefix = (*prefix, key)
             if child.value_type == "object" and child.children:
@@ -269,3 +269,46 @@ class AddScalarItemDialog(QDialog):
 
     def parsed_item(self) -> object:
         return self._parsed_item
+
+
+class AddDatasetDialog(QDialog):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Add Dataset")
+        self.resize(380, 140)
+
+        intro = QLabel(
+            "Create a new top-level array in the document (e.g. vegetables alongside fruits)."
+        )
+        intro.setWordWrap(True)
+
+        self._name_input = QLineEdit()
+        self._name_input.setPlaceholderText("dataset name, e.g. vegetables")
+
+        form = QFormLayout()
+        form.addRow("Name", self._name_input)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self._on_accept)
+        buttons.rejected.connect(self.reject)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(intro)
+        layout.addLayout(form)
+        layout.addWidget(buttons)
+
+    def _on_accept(self) -> None:
+        name = self._name_input.text().strip()
+        if not name:
+            QMessageBox.warning(self, "Add Dataset", "Dataset name is required.")
+            return
+        if not name.replace("_", "").isalnum():
+            QMessageBox.warning(self, "Add Dataset", "Use letters, numbers, and underscores only.")
+            return
+        self._name = name
+        self.accept()
+
+    def dataset_name(self) -> str:
+        return self._name

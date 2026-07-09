@@ -51,6 +51,9 @@ The blue <b>+</b> on the <i>right</i> of an array row adds a new item.</p>
   <li><b>Main table</b> — primary key first (<code>name</code>), then top-level fields (<code>color</code>)</li>
   <li><b>Related tables</b> — nested objects like <code>details</code> and <code>nutrients</code> appear as separate tables linked via the primary key</li>
   <li>Double-click a cell to edit (foreign key columns in child tables are read-only)</li>
+  <li><b>+ Dataset</b> — create a new top-level array (e.g. <code>vegetables</code> alongside <code>fruits</code>)</li>
+  <li><b>+ Add row</b> — on the main table, add a new item (opens the same form as graph add-item)</li>
+  <li>Form fields and columns follow <b>JSON key order</b> (e.g. <code>name</code>, <code>color</code>, then nested groups) — not alphabetical</li>
   <li>Return to the graph with <b>View → Graph Preview</b> (Ctrl+Shift+G)</li>
 </ul>
 

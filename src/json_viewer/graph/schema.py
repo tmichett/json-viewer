@@ -8,6 +8,20 @@ from typing import Any
 class FieldSchema:
     value_type: str
     children: dict[str, FieldSchema] = field(default_factory=dict)
+    child_order: list[str] = field(default_factory=list)
+
+
+def _ordered_keys(samples: list[dict[str, Any]]) -> list[str]:
+    order: list[str] = []
+    seen: set[str] = set()
+    for sample in samples:
+        if not isinstance(sample, dict):
+            continue
+        for key in sample:
+            if key not in seen:
+                order.append(key)
+                seen.add(key)
+    return order
 
 
 def _scalar_type(value: Any) -> str:
@@ -46,15 +60,17 @@ def infer_field_schema(samples: list[Any]) -> FieldSchema:
     if all(isinstance(value, dict) for value in values):
         children: dict[str, list[Any]] = {}
         for value in values:
+            if not isinstance(value, dict):
+                continue
             for key, child in value.items():
                 children.setdefault(key, []).append(child)
-        return FieldSchema(
-            "object",
-            {
-                key: infer_field_schema(child_samples)
-                for key, child_samples in children.items()
-            },
-        )
+        order = _ordered_keys([value for value in values if isinstance(value, dict)])
+        child_schemas = {
+            key: infer_field_schema(children[key])
+            for key in order
+            if key in children
+        }
+        return FieldSchema("object", child_schemas, order)
 
     if all(isinstance(value, list) for value in values):
         nested: list[Any] = []
@@ -86,7 +102,11 @@ def build_object_from_fields(
         return _parse_scalar(values.get(prefix, ""), schema.value_type)
 
     result: dict[str, Any] = {}
-    for key, child in schema.children.items():
+    keys = schema.child_order or list(schema.children)
+    for key in keys:
+        child = schema.children.get(key)
+        if child is None:
+            continue
         child_prefix = (*prefix, key)
         if child.value_type == "object":
             result[key] = build_object_from_fields(child, values, child_prefix)

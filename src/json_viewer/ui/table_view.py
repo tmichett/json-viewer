@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QScrollArea,
     QTableView,
     QVBoxLayout,
@@ -22,6 +23,7 @@ from json_viewer.graph.table_data import (
     TableSection,
     TableTarget,
     build_relational_tables,
+    can_add_top_level_dataset,
     discover_table_targets,
     format_cell,
     parse_cell_text,
@@ -126,7 +128,15 @@ class _ArrayTableModel(QAbstractTableModel):
 
 
 class _TableSectionWidget(QFrame):
-    def __init__(self, section: TableSection, entity_label: str, parent=None) -> None:
+    def __init__(
+        self,
+        section: TableSection,
+        entity_label: str,
+        *,
+        show_add_row: bool = False,
+        on_add_row=None,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self.section = section
         self.setFrameShape(QFrame.Shape.StyledPanel)
@@ -162,9 +172,16 @@ class _TableSectionWidget(QFrame):
         layout.addWidget(subtitle)
         layout.addWidget(self.table)
 
+        if show_add_row and on_add_row is not None:
+            self.add_row_btn = QPushButton("+ Add row")
+            self.add_row_btn.clicked.connect(on_add_row)
+            layout.addWidget(self.add_row_btn, alignment=Qt.AlignmentFlag.AlignLeft)
+
 
 class DataTableView(QWidget):
     cell_edited = pyqtSignal(int, int, object, object)  # section_index, row, TableColumn, value
+    add_dataset_requested = pyqtSignal()
+    add_row_requested = pyqtSignal()
 
     def __init__(self, theme_manager: ThemeManager, parent=None) -> None:
         super().__init__(parent)
@@ -183,10 +200,14 @@ class DataTableView(QWidget):
         self._summary = QLabel("")
         self._summary.setStyleSheet("color: gray;")
 
+        self._add_dataset_btn = QPushButton("+ Dataset")
+        self._add_dataset_btn.clicked.connect(self.add_dataset_requested.emit)
+
         header = QHBoxLayout()
         header.setContentsMargins(8, 8, 8, 4)
         header.addWidget(QLabel("Dataset:"))
         header.addWidget(self._path_combo, stretch=1)
+        header.addWidget(self._add_dataset_btn)
         header.addWidget(self._summary)
 
         self._sections_container = QWidget()
@@ -199,17 +220,27 @@ class DataTableView(QWidget):
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setWidget(self._sections_container)
 
-        self._empty_label = QLabel("No arrays found in this document.")
+        self._empty_label = QLabel("No datasets yet. Click + Dataset to create one.")
         self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty_label.setStyleSheet("color: gray; padding: 24px;")
+
+        self._empty_add_dataset_btn = QPushButton("+ Dataset")
+        self._empty_add_dataset_btn.clicked.connect(self.add_dataset_requested.emit)
+        empty_layout = QVBoxLayout()
+        empty_layout.addStretch()
+        empty_layout.addWidget(self._empty_label)
+        empty_layout.addWidget(self._empty_add_dataset_btn, alignment=Qt.AlignmentFlag.AlignHCenter)
+        empty_layout.addStretch()
+        self._empty_panel = QWidget()
+        self._empty_panel.setLayout(empty_layout)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addLayout(header)
         layout.addWidget(scroll, stretch=1)
-        layout.addWidget(self._empty_label)
-        self._empty_label.hide()
+        layout.addWidget(self._empty_panel)
+        self._empty_panel.hide()
 
         self.apply_theme()
 
@@ -227,15 +258,17 @@ class DataTableView(QWidget):
             self._table_set = None
             self._clear_sections()
             self._sections_container.hide()
-            self._empty_label.show()
+            self._empty_panel.show()
             self._path_combo.setEnabled(False)
+            self._update_dataset_controls()
             self._summary.setText("0 datasets")
             self._updating = False
             return
 
         self._sections_container.show()
-        self._empty_label.hide()
+        self._empty_panel.hide()
         self._path_combo.setEnabled(True)
+        self._update_dataset_controls()
 
         selected_index = 0
         for index, target in enumerate(self._targets):
@@ -278,7 +311,9 @@ class DataTableView(QWidget):
 
         if isinstance(self._table_set, TableData):
             section = TableSection("values", self._table_set.columns, self._table_set.rows)
-            widget = _TableSectionWidget(section, target.label)
+            widget = _TableSectionWidget(
+                section, target.label, show_add_row=True, on_add_row=self.add_row_requested.emit
+            )
             widget.model.edit_requested.connect(
                 lambda row, col, raw, w=widget: self._on_edit_requested(0, w, row, col, raw)
             )
@@ -291,7 +326,13 @@ class DataTableView(QWidget):
 
         entity_label = self._table_set.sections[0].label if self._table_set.sections else target.label
         for index, section in enumerate(self._table_set.sections):
-            widget = _TableSectionWidget(section, entity_label)
+            is_main = section.child_field is None
+            widget = _TableSectionWidget(
+                section,
+                entity_label,
+                show_add_row=is_main,
+                on_add_row=self.add_row_requested.emit if is_main else None,
+            )
             widget.model.edit_requested.connect(
                 lambda row, col, raw, idx=index, w=widget: self._on_edit_requested(idx, w, row, col, raw)
             )
@@ -332,6 +373,11 @@ class DataTableView(QWidget):
             return TableSection("values", self._table_set.columns, self._table_set.rows)
         return None
 
+    def _update_dataset_controls(self) -> None:
+        can_add = can_add_top_level_dataset(self._data)
+        self._add_dataset_btn.setVisible(can_add)
+        self._empty_add_dataset_btn.setVisible(can_add)
+
     def apply_theme(self) -> None:
         colors = self._theme.colors
         section_style = f"""
@@ -363,3 +409,13 @@ class DataTableView(QWidget):
         for widget in self._section_widgets:
             widget.setStyleSheet(section_style)
             widget.table.setStyleSheet(table_style)
+            if hasattr(widget, "add_row_btn"):
+                widget.add_row_btn.setStyleSheet(
+                    f"QPushButton {{ color: {colors.child_count}; padding: 4px 10px; }}"
+                )
+        self._add_dataset_btn.setStyleSheet(
+            f"QPushButton {{ color: {colors.editor_fg}; padding: 4px 10px; }}"
+        )
+        self._empty_add_dataset_btn.setStyleSheet(
+            f"QPushButton {{ color: {colors.editor_fg}; padding: 6px 14px; }}"
+        )

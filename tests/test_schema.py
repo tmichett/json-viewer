@@ -29,7 +29,14 @@ class TestSchema:
         assert schema is not None
         assert schema.value_type == "object"
         assert set(schema.children) == {"name", "color", "details", "nutrients"}
-        assert schema.children["details"].children.keys() == {"season", "type"}
+        assert schema.child_order == ["name", "color", "details", "nutrients"]
+        assert schema.children["details"].child_order == ["type", "season"]
+        assert schema.children["nutrients"].child_order == [
+            "calories",
+            "fiber",
+            "vitaminC",
+            "potassium",
+        ]
         assert set(schema.children["nutrients"].children) == {
             "calories",
             "fiber",

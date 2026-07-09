@@ -15,8 +15,17 @@ class TestDataEdit:
         data = {"fruits": [{"name": "Apple"}]}
         updated = add_array_item(data, ("fruits",))
         assert len(updated["fruits"]) == 2
-        assert updated["fruits"][1] == {}
+        assert updated["fruits"][1] == {"name": ""}
         assert data["fruits"] == [{"name": "Apple"}]
+
+    def test_add_array_item_copies_nested_shape(self):
+        data = {
+            "fruits": [
+                {"name": "Apple", "details": {"type": "Pome"}, "nutrients": {"calories": 52}},
+            ]
+        }
+        updated = add_array_item(data, ("fruits",))
+        assert updated["fruits"][1] == {"name": "", "details": {}, "nutrients": {}}
 
     def test_add_array_item_string_array(self):
         data = {"tags": ["a", "b"]}
@@ -33,10 +42,11 @@ class TestDataEdit:
         updated = add_array_item(data, ("items",))
         assert updated["items"] == [{}]
 
-    def test_add_object_key(self):
-        data = {"name": "Apple"}
-        updated = add_object_key(data, (), "color", "#FF0000")
-        assert updated == {"name": "Apple", "color": "#FF0000"}
+    def test_add_object_key_top_level_array(self):
+        data = {"fruits": [{"name": "Apple"}]}
+        updated = add_object_key(data, (), "vegetables", [])
+        assert updated["vegetables"] == []
+        assert len(updated["fruits"]) == 1
 
     def test_add_object_key_duplicate(self):
         data = {"name": "Apple"}
