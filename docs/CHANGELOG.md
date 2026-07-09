@@ -4,7 +4,21 @@ All notable changes to JSON Viewer. Version follows `src/json_viewer/__init__.py
 
 ## Branch: `feat-add-items` (ahead of `main`)
 
-**Commit:** `85c3599` — *FEAT: Easier editing and adding items*
+### Table preview (unreleased)
+
+**Added**
+
+- **Table preview mode** — switch right pane from graph to spreadsheet-style `QTableView`
+- **Array selector** — dropdown lists all arrays in the document (e.g. `fruits`, nested `data.items`)
+- **Flattened columns** — nested keys as dotted headers (`details.type`, `nutrients.calories`)
+- **Editable cells** — double-click to edit; syncs to editor via `set_value_at_path`
+- **View → Graph / Table Preview** — Ctrl+Shift+G / Ctrl+Shift+T; status bar **Preview** dropdown
+- Modules: `graph/table_data.py`, `ui/table_view.py`
+- Tests: `test_table_data.py` (54 tests total)
+
+---
+
+### Graph editing (`85c3599`)
 
 Graph-based data editing: add array items, add object keys, and edit scalar values directly on the node canvas. Changes sync back to the text editor.
 

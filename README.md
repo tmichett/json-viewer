@@ -12,6 +12,7 @@ Desktop graph visualizer for **JSON**, **YAML**, and **XML**, inspired by [JSON 
 - Zoom, pan, fit-to-view, and focus root node
 - Collapse/expand nested objects and arrays
 - **Graph editing** — add array items via schema-based forms, add object keys, edit scalar values; changes sync to the editor
+- **Table preview** — spreadsheet view for arrays with flattened nested columns; editable cells sync to editor
 - **Help menu** — Usage guide (F1) and About dialog with application version
 - Search nodes by key or value
 - Format/beautify documents

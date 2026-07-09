@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PyQt6.QtCore import QSettings, QTimer, Qt
-from PyQt6.QtGui import QAction, QDragEnterEvent, QDropEvent, QKeySequence
+from PyQt6.QtGui import QAction, QActionGroup, QDragEnterEvent, QDropEvent, QKeySequence
 from PyQt6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QSplitter,
+    QStackedWidget,
     QStatusBar,
     QVBoxLayout,
     QWidget,
@@ -24,12 +25,14 @@ from json_viewer.graph.data_edit import add_array_item, add_object_key, get_at_p
 from json_viewer.graph.models import JSONPath
 from json_viewer.graph.parser import graph_data_from_result, parse_graph_from_data
 from json_viewer.graph.schema import infer_array_item_schema
+from json_viewer.graph.table_data import TableColumn, TableTarget, cell_path
 from json_viewer.lint.linter import lint_content
 from json_viewer.ui.editor import CodeEditor
 from json_viewer.ui.graph_canvas import GraphCanvas
 from json_viewer.ui.graph_edit_dialog import AddArrayItemDialog, AddKeyDialog, AddScalarItemDialog, EditValueDialog
 from json_viewer.ui.search_bar import SearchBar
 from json_viewer.ui.theme import ThemeManager, ThemeMode
+from json_viewer.ui.table_view import DataTableView
 from json_viewer.ui.toolbar import GraphToolbar
 from json_viewer.ui.help_dialogs import show_about, show_usage_help
 from json_viewer.ui.widgets import ClickableLabel
@@ -89,6 +92,7 @@ class MainWindow(QMainWindow):
         self._live_transform = True
         self._view_format = DataFormat.JSON
         self._converting = False
+        self._preview_mode = "graph"
 
         self.setWindowTitle("JSON Viewer")
         self.resize(1400, 900)
@@ -100,6 +104,7 @@ class MainWindow(QMainWindow):
         self._graph = GraphCanvas(self._theme)
         self._graph_toolbar = GraphToolbar()
         self._search_bar = SearchBar()
+        self._table_view = DataTableView(self._theme)
 
         graph_panel = QWidget()
         graph_layout = QVBoxLayout(graph_panel)
@@ -109,9 +114,13 @@ class MainWindow(QMainWindow):
         graph_layout.addWidget(self._search_bar)
         graph_layout.addWidget(self._graph_toolbar)
 
+        self._preview_stack = QStackedWidget()
+        self._preview_stack.addWidget(graph_panel)
+        self._preview_stack.addWidget(self._table_view)
+
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.addWidget(self._editor)
-        splitter.addWidget(graph_panel)
+        splitter.addWidget(self._preview_stack)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
         splitter.setSizes([500, 900])
@@ -127,6 +136,10 @@ class MainWindow(QMainWindow):
         self._status_detail.setStyleSheet("color: gray;")
         self._status_live = QLabel("Live Transform: On")
         self._status_nodes = QLabel("Nodes: 0")
+        self._preview_mode_combo = QComboBox()
+        self._preview_mode_combo.addItem("Graph", "graph")
+        self._preview_mode_combo.addItem("Table", "table")
+        self._preview_mode_combo.currentIndexChanged.connect(self._on_preview_mode_changed)
         self._view_format_combo = QComboBox()
         for fmt in DataFormat:
             self._view_format_combo.addItem(fmt.label, fmt)
@@ -136,13 +149,15 @@ class MainWindow(QMainWindow):
         status.addWidget(self._status_detail, stretch=1)
         status.addPermanentWidget(self._status_live)
         status.addPermanentWidget(self._status_nodes)
+        status.addPermanentWidget(QLabel("Preview:"))
+        status.addPermanentWidget(self._preview_mode_combo)
         status.addPermanentWidget(QLabel("View as:"))
         status.addPermanentWidget(self._view_format_combo)
 
         self._debounce = QTimer()
         self._debounce.setSingleShot(True)
         self._debounce.setInterval(300)
-        self._debounce.timeout.connect(self._refresh_graph)
+        self._debounce.timeout.connect(self._refresh_preview)
 
         self._lint_debounce = QTimer()
         self._lint_debounce.setSingleShot(True)
@@ -160,12 +175,14 @@ class MainWindow(QMainWindow):
         self._graph.add_array_item.connect(self._on_graph_add_array_item)
         self._graph.add_object_key.connect(self._on_graph_add_object_key)
         self._graph.edit_scalar.connect(self._on_graph_edit_scalar)
+        self._table_view.cell_edited.connect(self._on_table_cell_edited)
 
         self._editor.set_data_format(self._view_format)
         self._sync_view_format_combo()
+        self._sync_preview_mode_combo()
         self._editor.setPlainText(EXAMPLE_JSON)
         self._run_lint()
-        self._refresh_graph()
+        self._refresh_preview()
         self._graph.fit_view()
 
     def _build_menus(self) -> None:
@@ -216,6 +233,26 @@ class MainWindow(QMainWindow):
         focus_action = QAction("Focus &Root Node", self)
         focus_action.triggered.connect(self._graph.focus_root)
         view_menu.addAction(focus_action)
+
+        view_menu.addSeparator()
+
+        preview_group = QActionGroup(self)
+        graph_preview_action = QAction("&Graph Preview", self)
+        graph_preview_action.setCheckable(True)
+        graph_preview_action.setChecked(True)
+        graph_preview_action.setShortcut(QKeySequence("Ctrl+Shift+G"))
+        graph_preview_action.triggered.connect(lambda: self._set_preview_mode("graph"))
+        preview_group.addAction(graph_preview_action)
+        view_menu.addAction(graph_preview_action)
+
+        table_preview_action = QAction("&Table Preview", self)
+        table_preview_action.setCheckable(True)
+        table_preview_action.setShortcut(QKeySequence("Ctrl+Shift+T"))
+        table_preview_action.triggered.connect(lambda: self._set_preview_mode("table"))
+        preview_group.addAction(table_preview_action)
+        view_menu.addAction(table_preview_action)
+        self._graph_preview_action = graph_preview_action
+        self._table_preview_action = table_preview_action
 
         view_menu.addSeparator()
         view_as_menu = view_menu.addMenu("View &As")
@@ -368,7 +405,30 @@ class MainWindow(QMainWindow):
         self._update_title()
         self._run_lint()
         if self._live_transform:
-            self._refresh_graph()
+            self._refresh_preview()
+
+    def _sync_preview_mode_combo(self) -> None:
+        index = self._preview_mode_combo.findData(self._preview_mode)
+        if index >= 0:
+            self._preview_mode_combo.blockSignals(True)
+            self._preview_mode_combo.setCurrentIndex(index)
+            self._preview_mode_combo.blockSignals(False)
+
+    def _on_preview_mode_changed(self) -> None:
+        mode = self._preview_mode_combo.currentData()
+        if mode and mode != self._preview_mode:
+            self._set_preview_mode(mode)
+
+    def _set_preview_mode(self, mode: str) -> None:
+        if mode not in ("graph", "table"):
+            return
+        self._preview_mode = mode
+        self._preview_stack.setCurrentIndex(0 if mode == "graph" else 1)
+        self._sync_preview_mode_combo()
+        self._graph_preview_action.setChecked(mode == "graph")
+        self._table_preview_action.setChecked(mode == "table")
+        if mode == "graph":
+            self._graph.fit_view()
 
     def _sync_view_format_combo(self) -> None:
         index = self._view_format_combo.findData(self._view_format)
@@ -381,7 +441,7 @@ class MainWindow(QMainWindow):
         self._live_transform = not self._live_transform
         self._status_live.setText(f"Live Transform: {'On' if self._live_transform else 'Off'}")
         if self._live_transform:
-            self._refresh_graph()
+            self._refresh_preview()
 
     def _toggle_theme(self) -> None:
         from PyQt6.QtWidgets import QApplication
@@ -392,8 +452,9 @@ class MainWindow(QMainWindow):
             self._theme.apply_to_app(app)
         self._editor.apply_theme()
         self._graph.apply_theme()
+        self._table_view.apply_theme()
 
-    def _refresh_graph(self) -> None:
+    def _refresh_preview(self) -> None:
         text = self._editor.toPlainText()
         result = parse_content(text, self._view_format)
 
@@ -401,6 +462,7 @@ class MainWindow(QMainWindow):
             self._update_lint_status(result.errors)
             self._editor.set_lint_errors(result.errors)
             self._graph.set_graph(None)
+            self._table_view.set_data(None)
             self._status_nodes.setText("Nodes: 0")
             return
 
@@ -411,6 +473,29 @@ class MainWindow(QMainWindow):
         graph = graph_data_from_result(graph_result)
         self._graph.set_graph(graph)
         self._status_nodes.setText(f"Nodes: {len(graph.nodes)}")
+
+        preferred = self._table_view.current_path()
+        self._table_view.set_data(result.data, preferred_path=preferred)
+
+    def _on_table_cell_edited(self, section_index: int, row: int, column: TableColumn, value: object) -> None:
+        data = self._current_parsed_data()
+        if data is None:
+            return
+
+        target = self._table_view.current_target()
+        section = self._table_view.section_at(section_index)
+        if target is None or section is None:
+            return
+
+        path = cell_path(target, section, row, column)
+        try:
+            updated = set_value_at_path(data, path, value)
+        except (TypeError, KeyError, IndexError, ValueError) as exc:
+            QMessageBox.warning(self, "Edit Cell", str(exc))
+            self._refresh_preview()
+            return
+
+        self._apply_data(updated)
 
     def _current_parsed_data(self):
         text = self._editor.toPlainText()
@@ -428,7 +513,7 @@ class MainWindow(QMainWindow):
         self._dirty = True
         self._update_title()
         self._run_lint()
-        self._refresh_graph()
+        self._refresh_preview()
         if expand_paths:
             for path in expand_paths:
                 self._graph.expand_path(path)
@@ -544,7 +629,7 @@ class MainWindow(QMainWindow):
         self._converting = True
         self._editor.setPlainText(formatted)
         self._converting = False
-        self._refresh_graph()
+        self._refresh_preview()
 
     def _open_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -573,7 +658,7 @@ class MainWindow(QMainWindow):
         self._dirty = False
         self._update_title()
         self._run_lint()
-        self._refresh_graph()
+        self._refresh_preview()
         self._graph.fit_view()
         self._add_recent(path)
 

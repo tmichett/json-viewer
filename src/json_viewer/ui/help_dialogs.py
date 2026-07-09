@@ -43,6 +43,17 @@ Supports <b>JSON</b>, <b>YAML</b>, and <b>XML</b>. All processing happens locall
 <p><b>Note:</b> The <b>+ / −</b> on the <i>left</i> of a row collapses or expands children.
 The blue <b>+</b> on the <i>right</i> of an array row adds a new item.</p>
 
+<h3>Table preview</h3>
+<p>Switch the right pane to a database-style relational view instead of the graph.</p>
+<ul>
+  <li>Use the <b>Preview</b> dropdown in the status bar, or <b>View → Table Preview</b> (Ctrl+Shift+T)</li>
+  <li>Choose which array to display from the <b>Dataset</b> dropdown (e.g. <code>fruits</code>)</li>
+  <li><b>Main table</b> — primary key first (<code>name</code>), then top-level fields (<code>color</code>)</li>
+  <li><b>Related tables</b> — nested objects like <code>details</code> and <code>nutrients</code> appear as separate tables linked via the primary key</li>
+  <li>Double-click a cell to edit (foreign key columns in child tables are read-only)</li>
+  <li>Return to the graph with <b>View → Graph Preview</b> (Ctrl+Shift+G)</li>
+</ul>
+
 <h3>Graph navigation</h3>
 <ul>
   <li>Drag to pan; <b>Ctrl+scroll</b> or the zoom slider to zoom</li>

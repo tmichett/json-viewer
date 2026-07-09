@@ -61,7 +61,8 @@ The window has three main areas:
 
 | Control | Purpose |
 |---------|---------|
-| **Search nodes** | Find graph nodes by key or value; use ◀ ▶ to cycle matches |
+| **Preview** | Switch right pane between **Graph** and **Table** views |
+| **Search nodes** | Find graph nodes by key or value; use ◀ ▶ to cycle matches (graph mode) |
 | **− + Fit Root** | Zoom out, zoom in, fit graph to view, focus root node |
 | **Zoom slider** | Drag the slider in the graph pane (bottom-right) for fine zoom control |
 | **Valid / Invalid** | Live syntax status; click **Invalid** to jump to the error |
@@ -130,6 +131,36 @@ The editor validates syntax continuously as you type.
 | List all errors | **Tools → Validate Document** (Cmd/Ctrl+Shift+V) |
 
 The linter runs even when **Live Transform** is off, so you always get syntax feedback while editing.
+
+---
+
+## Table preview
+
+Switch the right pane from the relationship graph to a **spreadsheet-style table** — useful for array data like database records.
+
+### Enable table view
+
+- Choose **Table** from the **Preview** dropdown in the status bar, or
+- **View → Table Preview** (Ctrl+Shift+T on Windows/Linux, Cmd+Shift+T on macOS)
+
+Return to the graph with **View → Graph Preview** (Ctrl+Shift+G).
+
+### Choose which array
+
+Use the **Table** dropdown at the top of the table pane to pick an array (e.g. `fruits`). The app discovers all arrays in the document, including nested ones like `data.items`.
+
+### Columns and rows
+
+The table view organizes data like a **relational database**, not one wide flat spreadsheet:
+
+- **Main table** (e.g. `fruits`) — primary key column first (`name`), then other top-level fields (`color`)
+- **Related tables** (e.g. `details`, `nutrients`) — one per nested object, linked back via the primary key (`name →`)
+- Foreign key columns in child tables are read-only; edit the main table to change the key
+- Scalar arrays (e.g. `["a", "b"]`) still show a single **value** column
+
+### Edit cells
+
+Double-click any cell to edit. Changes sync to the text editor immediately and mark the document as unsaved.
 
 ---
 
@@ -258,6 +289,8 @@ The export captures what is visible in the graph canvas at the time of export.
 | Toggle live transform | Cmd+L | Ctrl+L |
 | Fit graph | Cmd+0 | Ctrl+0 |
 | Search nodes | Cmd+F | Ctrl+F |
+| Graph preview | Cmd+Shift+G | Ctrl+Shift+G |
+| Table preview | Cmd+Shift+T | Ctrl+Shift+T |
 | Go to error | F8 | F8 |
 | Usage help | F1 | F1 |
 | Quit | Cmd+Q | Ctrl+Q |
