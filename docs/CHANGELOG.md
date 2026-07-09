@@ -4,17 +4,21 @@ All notable changes to JSON Viewer. Version follows `src/json_viewer/__init__.py
 
 ## Branch: `feat-add-items` (ahead of `main`)
 
-### Table preview (unreleased)
+### Table preview (`1a90461`)
 
 **Added**
 
-- **Table preview mode** — switch right pane from graph to spreadsheet-style `QTableView`
-- **Array selector** — dropdown lists all arrays in the document (e.g. `fruits`, nested `data.items`)
-- **Flattened columns** — nested keys as dotted headers (`details.type`, `nutrients.calories`)
-- **Editable cells** — double-click to edit; syncs to editor via `set_value_at_path`
+- **Table preview mode** — switch right pane from graph to relational database-style tables
+- **Main + child tables** — primary key first (`name`); nested objects (`details`, `nutrients`) as separate linked tables
+- **Array selector** — Dataset dropdown lists arrays in the document
+- **Editable cells** — double-click to edit; FK columns read-only; syncs via `set_value_at_path`
 - **View → Graph / Table Preview** — Ctrl+Shift+G / Ctrl+Shift+T; status bar **Preview** dropdown
 - Modules: `graph/table_data.py`, `ui/table_view.py`
-- Tests: `test_table_data.py` (54 tests total)
+- Tests: `test_table_data.py`, `test_table_view.py` (57 tests total)
+
+**Fixed**
+
+- Empty table boxes — `_ArrayTableModel` now loads section rows in `__init__`
 
 ---
 
