@@ -74,6 +74,49 @@ def add_object_key(data: Any, path: JSONPath, key: str, value: Any) -> Any | Non
     return updated
 
 
+def add_key_to_nested_objects_in_array(
+    data: Any,
+    array_path: JSONPath,
+    child_field: str,
+    key: str,
+    value: Any,
+) -> Any | None:
+    """Add a scalar key to a nested object field on every item in an array."""
+    updated = copy.deepcopy(data)
+    items = get_at_path(updated, array_path)
+    if not isinstance(items, list):
+        raise TypeError(f"Expected list at path {array_path!r}, got {type(items).__name__}")
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        nested = item.get(child_field)
+        if isinstance(nested, dict) and key in nested:
+            return None
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        nested = item.get(child_field)
+        if not isinstance(nested, dict):
+            item[child_field] = {}
+            nested = item[child_field]
+        nested[key] = copy.deepcopy(value) if isinstance(value, (dict, list)) else value
+
+    return updated
+
+
+def set_nested_value(root: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
+    if not path:
+        raise ValueError("Path is required")
+    current: Any = root
+    for key in path[:-1]:
+        if key not in current or not isinstance(current[key], dict):
+            current[key] = {}
+        current = current[key]
+    current[path[-1]] = value
+
+
 def set_value_at_path(data: Any, path: JSONPath, value: Any) -> Any:
     updated = copy.deepcopy(data)
     if not path:

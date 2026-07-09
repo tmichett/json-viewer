@@ -21,7 +21,13 @@ from PyQt6.QtWidgets import (
 from json_viewer.adapters.base import convert_content, format_content, parse_content
 from json_viewer.adapters.types import DataFormat
 from json_viewer.export.image_export import export_png, export_svg
-from json_viewer.graph.data_edit import add_array_item, add_object_key, get_at_path, set_value_at_path
+from json_viewer.graph.data_edit import (
+    add_array_item,
+    add_key_to_nested_objects_in_array,
+    add_object_key,
+    get_at_path,
+    set_value_at_path,
+)
 from json_viewer.graph.models import JSONPath
 from json_viewer.graph.parser import graph_data_from_result, parse_graph_from_data
 from json_viewer.graph.schema import infer_array_item_schema
@@ -184,6 +190,7 @@ class MainWindow(QMainWindow):
         self._table_view.cell_edited.connect(self._on_table_cell_edited)
         self._table_view.add_dataset_requested.connect(self._on_table_add_dataset)
         self._table_view.add_row_requested.connect(self._on_table_add_row)
+        self._table_view.add_key_requested.connect(self._on_table_add_key)
 
         self._editor.set_data_format(self._view_format)
         self._sync_view_format_combo()
@@ -572,6 +579,44 @@ class MainWindow(QMainWindow):
         if target is None:
             return
         self._add_array_item_at_path(target.path)
+
+    def _on_table_add_key(self, section_index: int) -> None:
+        data = self._current_parsed_data()
+        target = self._table_view.current_target()
+        section = self._table_view.section_at(section_index)
+        if data is None or target is None or section is None or not section.child_field:
+            return
+
+        dialog = AddKeyDialog(self, scalar_only=True)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+
+        key, value = dialog.result_key_value()
+        if isinstance(value, (dict, list)):
+            QMessageBox.warning(
+                self,
+                "Add Key",
+                "Child table keys must be scalar values (string, number, boolean, or null).",
+            )
+            return
+
+        try:
+            updated = add_key_to_nested_objects_in_array(
+                data, target.path, section.child_field, key, value
+            )
+        except (TypeError, KeyError, IndexError) as exc:
+            QMessageBox.warning(self, "Add Key", str(exc))
+            return
+
+        if updated is None:
+            QMessageBox.warning(
+                self,
+                "Add Key",
+                f'Key "{key}" already exists in {section.child_field}.',
+            )
+            return
+
+        self._apply_data(updated, table_path=target.path)
 
     def _on_graph_add_array_item(self, path: JSONPath) -> None:
         self._add_array_item_at_path(path)

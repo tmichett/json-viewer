@@ -135,6 +135,8 @@ class _TableSectionWidget(QFrame):
         *,
         show_add_row: bool = False,
         on_add_row=None,
+        show_add_key: bool = False,
+        on_add_key=None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -177,11 +179,17 @@ class _TableSectionWidget(QFrame):
             self.add_row_btn.clicked.connect(on_add_row)
             layout.addWidget(self.add_row_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        if show_add_key and on_add_key is not None:
+            self.add_key_btn = QPushButton("+ Add key")
+            self.add_key_btn.clicked.connect(on_add_key)
+            layout.addWidget(self.add_key_btn, alignment=Qt.AlignmentFlag.AlignLeft)
+
 
 class DataTableView(QWidget):
     cell_edited = pyqtSignal(int, int, object, object)  # section_index, row, TableColumn, value
     add_dataset_requested = pyqtSignal()
     add_row_requested = pyqtSignal()
+    add_key_requested = pyqtSignal(int)
 
     def __init__(self, theme_manager: ThemeManager, parent=None) -> None:
         super().__init__(parent)
@@ -332,6 +340,10 @@ class DataTableView(QWidget):
                 entity_label,
                 show_add_row=is_main,
                 on_add_row=self.add_row_requested.emit if is_main else None,
+                show_add_key=not is_main,
+                on_add_key=(lambda _checked=False, idx=index: self.add_key_requested.emit(idx))
+                if not is_main
+                else None,
             )
             widget.model.edit_requested.connect(
                 lambda row, col, raw, idx=index, w=widget: self._on_edit_requested(idx, w, row, col, raw)
@@ -411,6 +423,10 @@ class DataTableView(QWidget):
             widget.table.setStyleSheet(table_style)
             if hasattr(widget, "add_row_btn"):
                 widget.add_row_btn.setStyleSheet(
+                    f"QPushButton {{ color: {colors.child_count}; padding: 4px 10px; }}"
+                )
+            if hasattr(widget, "add_key_btn"):
+                widget.add_key_btn.setStyleSheet(
                     f"QPushButton {{ color: {colors.child_count}; padding: 4px 10px; }}"
                 )
         self._add_dataset_btn.setStyleSheet(

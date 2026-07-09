@@ -9,12 +9,13 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPushButton,
     QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
-from json_viewer.graph.data_edit import parse_typed_value
+from json_viewer.graph.data_edit import parse_typed_value, set_nested_value
 from json_viewer.graph.schema import FieldSchema, build_object_from_fields
 
 
@@ -29,7 +30,7 @@ VALUE_TYPES = [
 
 
 class AddKeyDialog(QDialog):
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, *, scalar_only: bool = False) -> None:
         super().__init__(parent)
         self.setWindowTitle("Add Key")
         self.resize(360, 160)
@@ -39,6 +40,8 @@ class AddKeyDialog(QDialog):
 
         self._type_combo = QComboBox()
         for label, value in VALUE_TYPES:
+            if scalar_only and value in ("object", "array"):
+                continue
             self._type_combo.addItem(label, value)
 
         self._value_input = QLineEdit()
@@ -86,6 +89,9 @@ class AddKeyDialog(QDialog):
 
     def result_key_value(self) -> tuple[str, object]:
         return self._parsed_key, self._parsed_value
+
+    def result_value_type(self) -> str:
+        return self._type_combo.currentData()
 
 
 class EditValueDialog(QDialog):
@@ -160,6 +166,7 @@ class AddArrayItemDialog(QDialog):
         self.resize(420, 480)
         self._schema = schema
         self._inputs: dict[tuple[str, ...], QLineEdit] = {}
+        self._dynamic_fields: dict[tuple[str, ...], str] = {}
 
         layout = QVBoxLayout(self)
         if subtitle:
@@ -194,6 +201,11 @@ class AddArrayItemDialog(QDialog):
                 group = QGroupBox(key)
                 group_layout = QVBoxLayout(group)
                 self._build_fields(group_layout, child, child_prefix)
+                add_key_btn = QPushButton("+ Add key")
+                add_key_btn.clicked.connect(
+                    lambda _checked=False, gl=group_layout, p=child_prefix: self._on_add_nested_key(gl, p)
+                )
+                group_layout.addWidget(add_key_btn)
                 layout.addWidget(group)
                 continue
 
@@ -205,6 +217,32 @@ class AddArrayItemDialog(QDialog):
             row_form.addRow(key, field)
             self._inputs[child_prefix] = field
             layout.addWidget(row_host)
+
+    def _on_add_nested_key(self, group_layout: QVBoxLayout, prefix: tuple[str, ...]) -> None:
+        dialog = AddKeyDialog(self, scalar_only=True)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+
+        key, value = dialog.result_key_value()
+        child_prefix = (*prefix, key)
+        if child_prefix in self._inputs:
+            QMessageBox.warning(self, self.windowTitle(), f'Key "{key}" already exists in this section.')
+            return
+
+        value_type = dialog.result_value_type()
+        row_host = QWidget()
+        row_form = QFormLayout(row_host)
+        row_form.setContentsMargins(0, 0, 0, 0)
+        field = QLineEdit()
+        if value is not None and value_type != "null":
+            field.setText(str(value).lower() if value_type == "boolean" else str(value))
+        else:
+            field.setPlaceholderText(self._placeholder_for(FieldSchema(value_type)))
+        row_form.addRow(key, field)
+        insert_index = max(group_layout.count() - 1, 0)
+        group_layout.insertWidget(insert_index, row_host)
+        self._inputs[child_prefix] = field
+        self._dynamic_fields[child_prefix] = value_type
 
     def _placeholder_for(self, schema: FieldSchema) -> str:
         if schema.value_type == "number":
@@ -218,7 +256,15 @@ class AddArrayItemDialog(QDialog):
     def _on_accept(self) -> None:
         try:
             values = {path: field.text() for path, field in self._inputs.items()}
-            self._parsed_item = build_object_from_fields(self._schema, values)
+            item = build_object_from_fields(self._schema, values)
+            for path, value_type in self._dynamic_fields.items():
+                raw = values.get(path, "")
+                if value_type == "string":
+                    parsed = raw
+                else:
+                    parsed = parse_typed_value(raw, value_type)
+                set_nested_value(item, path, parsed)
+            self._parsed_item = item
         except ValueError as exc:
             QMessageBox.warning(self, self.windowTitle(), str(exc))
             return

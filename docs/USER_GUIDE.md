@@ -173,6 +173,8 @@ On the **main table** (e.g. `fruits`), click **+ Add row** below the grid. This 
 
 Child tables (`details`, `nutrients`) do not have their own add-row button — rows are tied to the main table. Add a row on `fruits`, then fill in child table cells.
 
+Use **+ Add key** below a child table to add a new field to that nested object on every row (e.g. add `origin` to all `details` records). Double-click cells to set values per item.
+
 ---
 
 ## Graph interaction
