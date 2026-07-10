@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -10,6 +11,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -127,6 +129,11 @@ class _ArrayTableModel(QAbstractTableModel):
         return None
 
 
+ROW_HEIGHT = 28
+SECTION_MARGIN = 12
+SECTION_SPACING = 8
+
+
 class _TableSectionWidget(QFrame):
     def __init__(
         self,
@@ -142,17 +149,25 @@ class _TableSectionWidget(QFrame):
         super().__init__(parent)
         self.section = section
         self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
 
         if section.child_field:
-            title = QLabel(f"{section.label}")
+            title = QLabel(section.label)
             subtitle = QLabel(f"Related to {entity_label} via {section.foreign_key}")
-            subtitle.setStyleSheet("color: gray; font-size: 11px;")
         else:
-            title = QLabel(f"{section.label}")
-            subtitle = QLabel(f"Primary key: {section.columns[0].header if section.columns else '—'}")
-            subtitle.setStyleSheet("color: gray; font-size: 11px;")
+            title = QLabel(section.label)
+            pk = section.columns[0].header if section.columns else "—"
+            subtitle = QLabel(f"Primary key: {pk}")
 
-        title.setStyleSheet("font-weight: 600; font-size: 13px;")
+        title_font = QFont(title.font())
+        title_font.setWeight(QFont.Weight.DemiBold)
+        title_font.setPointSize(10)
+        title.setFont(title_font)
+
+        subtitle_font = QFont(subtitle.font())
+        subtitle_font.setPointSize(9)
+        subtitle.setFont(subtitle_font)
+        subtitle.setStyleSheet("color: gray;")
 
         self.model = _ArrayTableModel(section)
         self.table = QTableView()
@@ -161,28 +176,46 @@ class _TableSectionWidget(QFrame):
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.verticalHeader().setVisible(True)
-        self.table.verticalHeader().setDefaultSectionSize(28)
-        row_height = 32
-        header_height = self.table.horizontalHeader().sizeHint().height()
-        table_height = header_height + row_height * max(len(section.rows), 1) + 4
-        self.table.setFixedHeight(table_height)
+        self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
+        self.table.setShowGrid(True)
+        self.table.setWordWrap(False)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.table.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self._fit_table_height()
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(SECTION_MARGIN, SECTION_MARGIN, SECTION_MARGIN, SECTION_MARGIN)
+        layout.setSpacing(4)
         layout.addWidget(title)
         layout.addWidget(subtitle)
         layout.addWidget(self.table)
 
         if show_add_row and on_add_row is not None:
-            self.add_row_btn = QPushButton("+ Add row")
-            self.add_row_btn.clicked.connect(on_add_row)
+            self.add_row_btn = self._make_action_button("+ Add row", on_add_row)
             layout.addWidget(self.add_row_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
         if show_add_key and on_add_key is not None:
-            self.add_key_btn = QPushButton("+ Add key")
-            self.add_key_btn.clicked.connect(on_add_key)
+            self.add_key_btn = self._make_action_button("+ Add key", on_add_key)
             layout.addWidget(self.add_key_btn, alignment=Qt.AlignmentFlag.AlignLeft)
+
+    @staticmethod
+    def _make_action_button(label: str, handler) -> QPushButton:
+        button = QPushButton(label)
+        button.setFlat(True)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.clicked.connect(handler)
+        return button
+
+    def _fit_table_height(self) -> None:
+        row_count = max(self.model.rowCount(), 1)
+        header_height = self.table.horizontalHeader().sizeHint().height()
+        if header_height <= 0:
+            header_height = ROW_HEIGHT
+        frame = self.table.frameWidth() * 2
+        height = header_height + ROW_HEIGHT * row_count + frame + 2
+        self.table.setFixedHeight(height)
 
 
 class DataTableView(QWidget):
@@ -206,22 +239,26 @@ class DataTableView(QWidget):
         self._path_combo.currentIndexChanged.connect(self._on_path_changed)
 
         self._summary = QLabel("")
-        self._summary.setStyleSheet("color: gray;")
+        self._summary.setStyleSheet("color: gray; font-size: 10px;")
 
         self._add_dataset_btn = QPushButton("+ Dataset")
         self._add_dataset_btn.clicked.connect(self.add_dataset_requested.emit)
 
         header = QHBoxLayout()
-        header.setContentsMargins(8, 8, 8, 4)
-        header.addWidget(QLabel("Dataset:"))
+        header.setContentsMargins(12, 8, 12, 6)
+        dataset_label = QLabel("Dataset:")
+        dataset_label.setStyleSheet("color: gray; font-size: 10px; font-weight: 600;")
+        header.addWidget(dataset_label)
         header.addWidget(self._path_combo, stretch=1)
         header.addWidget(self._add_dataset_btn)
         header.addWidget(self._summary)
 
         self._sections_container = QWidget()
+        self._sections_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         self._sections_layout = QVBoxLayout(self._sections_container)
-        self._sections_layout.setContentsMargins(8, 0, 8, 8)
-        self._sections_layout.setSpacing(12)
+        self._sections_layout.setContentsMargins(12, 0, 12, 12)
+        self._sections_layout.setSpacing(SECTION_SPACING)
+        self._sections_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -328,6 +365,7 @@ class DataTableView(QWidget):
             self._sections_layout.insertWidget(0, widget)
             self._section_widgets.append(widget)
             widget.table.resizeColumnsToContents()
+            self._sections_layout.addStretch()
             self._summary.setText(f"{len(section.rows)} rows")
             self.apply_theme()
             return
@@ -351,6 +389,8 @@ class DataTableView(QWidget):
             self._sections_layout.insertWidget(index, widget)
             self._section_widgets.append(widget)
             widget.table.resizeColumnsToContents()
+
+        self._sections_layout.addStretch()
 
         row_count = len(self._table_set.sections[0].rows) if self._table_set.sections else 0
         table_count = len(self._table_set.sections)
@@ -407,30 +447,40 @@ class DataTableView(QWidget):
                 selection-background-color: {colors.selection_bg};
                 selection-color: {colors.editor_fg};
                 alternate-background-color: {colors.grid_bg};
+                border: 1px solid {colors.divider};
             }}
             QHeaderView::section {{
                 background-color: {colors.toolbar_bg};
                 color: {colors.editor_fg};
-                padding: 4px 8px;
+                padding: 2px 8px;
                 border: none;
                 border-right: 1px solid {colors.divider};
                 border-bottom: 1px solid {colors.divider};
                 font-weight: 600;
+                font-size: 11px;
+            }}
+        """
+        action_style = f"""
+            QPushButton {{
+                color: {colors.highlight};
+                border: none;
+                padding: 2px 0;
+                text-align: left;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{
+                text-decoration: underline;
             }}
         """
         for widget in self._section_widgets:
             widget.setStyleSheet(section_style)
             widget.table.setStyleSheet(table_style)
             if hasattr(widget, "add_row_btn"):
-                widget.add_row_btn.setStyleSheet(
-                    f"QPushButton {{ color: {colors.child_count}; padding: 4px 10px; }}"
-                )
+                widget.add_row_btn.setStyleSheet(action_style)
             if hasattr(widget, "add_key_btn"):
-                widget.add_key_btn.setStyleSheet(
-                    f"QPushButton {{ color: {colors.child_count}; padding: 4px 10px; }}"
-                )
+                widget.add_key_btn.setStyleSheet(action_style)
         self._add_dataset_btn.setStyleSheet(
-            f"QPushButton {{ color: {colors.editor_fg}; padding: 4px 10px; }}"
+            f"QPushButton {{ color: {colors.highlight}; border: 1px solid {colors.divider}; padding: 4px 10px; font-size: 11px; }}"
         )
         self._empty_add_dataset_btn.setStyleSheet(
             f"QPushButton {{ color: {colors.editor_fg}; padding: 6px 14px; }}"

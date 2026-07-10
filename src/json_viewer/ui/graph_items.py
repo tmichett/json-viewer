@@ -94,6 +94,8 @@ class NodeGraphicsItem(QGraphicsRectItem):
         painter.setPen(QPen(QColor(colors.node_stroke), 1))
         painter.drawPath(path)
 
+        self._paint_row_dividers(painter)
+
         font = QFont("Menlo, Monaco, Consolas, monospace", 10)
         font.setWeight(QFont.Weight.Medium)
         painter.setFont(font)
@@ -109,6 +111,27 @@ class NodeGraphicsItem(QGraphicsRectItem):
 
         if is_root_array_node(self.node):
             self._paint_add_row(painter, y, "root_array", "+ Add item")
+
+    def _row_count(self) -> int:
+        count = len(self.node.text)
+        if is_object_node(self.node):
+            count += 1
+        if is_root_array_node(self.node):
+            count += 1
+        return count
+
+    def _paint_row_dividers(self, painter: QPainter) -> None:
+        row_count = self._row_count()
+        if row_count <= 1:
+            return
+
+        colors = self._theme.colors
+        left = PADDING_X
+        right = self.rect().width() - PADDING_X
+        painter.setPen(QPen(QColor(colors.divider), 1))
+        for index in range(1, row_count):
+            line_y = PADDING_X + index * ROW_HEIGHT
+            painter.drawLine(QPointF(left, line_y), QPointF(right, line_y))
 
     def _paint_add_row(self, painter: QPainter, y: float, kind: str, label: str) -> None:
         colors = self._theme.colors
