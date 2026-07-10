@@ -4,10 +4,28 @@ All notable changes to JSON Viewer. Version follows `src/json_viewer/__init__.py
 
 ## Branch: `feat-add-items` (ahead of `main`)
 
-### Table add controls + field order (working tree)
+### UI polish (`7edf23b`)
+
+**Graph nodes**
+
+- Faint horizontal row dividers inside node boxes (JSON Crack style), using theme `divider` color
+
+**Table preview layout**
+
+- Compact section cards — tables sized to row count (no vertical stretch / wasted space)
+- Sections align to top of scroll area; link-style **+ Add row** / **+ Add key** buttons
+- Hidden row-number column; tighter header padding and table border
+
+**Changed:** `ui/graph_items.py`, `ui/table_view.py`
+
+---
+
+### Child table add key + dataset controls (`c307c04`, `5897ca3`)
 
 **Added**
 
+- **+ Add key** on child tables — `add_key_to_nested_objects_in_array()` adds scalar field to every row
+- **+ Add key** inside nested groups in the add-item form
 - **+ Dataset** — create a new top-level array on the JSON root (e.g. `vegetables` alongside `fruits`)
 - **+ Add row** — on the main table only; opens the same schema form as graph **+** on an array
 - **`template_object_from_sample()`** — new array items get nested `{}` shells matching sibling structure
@@ -17,9 +35,8 @@ All notable changes to JSON Viewer. Version follows `src/json_viewer/__init__.py
 
 - `graph/schema.py` — `child_order` list on `FieldSchema`; first-seen key order from sample dicts
 - `graph/table_data.py` — column order follows document order (PK first, then sibling keys)
-- `ui/graph_edit_dialog.py` — form fields iterate `child_order`
-- `ui/table_view.py`, `ui/main_window.py` — dataset/row add wiring
-- Tests: 59 total (`test_schema.py`, `test_table_data.py`, `test_data_edit.py`)
+- `ui/graph_edit_dialog.py`, `ui/main_window.py`, `ui/table_view.py`, `ui/help_dialogs.py`
+- Tests: 62 total
 
 ---
 

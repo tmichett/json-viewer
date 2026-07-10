@@ -55,6 +55,7 @@ The window has three main areas:
 - Click **+ Add key** at the bottom of object nodes to add a property
 - Click any scalar value (string, number, etc.) to edit it in a dialog
 - Hex color values (e.g. `#FF0000`) show a small color swatch
+- Faint horizontal lines separate rows inside each node (JSON Crack style)
 - Graph edits sync back to the text editor automatically
 
 ### Bottom controls
@@ -158,6 +159,7 @@ The table view organizes data like a **relational database**, not one wide flat 
 - Foreign key columns in child tables are read-only; edit the main table to change the key
 - Scalar arrays (e.g. `["a", "b"]`) still show a single **value** column
 - **Field order** — form fields and table columns follow the key order in your JSON document (e.g. `name`, `color`, then `details`, `nutrients`), not alphabetical order
+- **Compact layout** — each table sizes to its rows; sections stack at the top without large empty gaps
 
 ### Edit cells
 

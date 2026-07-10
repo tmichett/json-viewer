@@ -60,7 +60,7 @@ Graph edits flow through `MainWindow`: the canvas emits signals, `data_edit` mut
 | `graph/data_edit.py` | Path-based mutations: `add_array_item`, `add_object_key`, `set_value_at_path` |
 | `graph/schema.py` | Infers field schema from existing array items for the add-item form |
 | `ui/graph_edit_dialog.py` | `AddKeyDialog`, `AddArrayItemDialog`, `EditValueDialog`, `AddScalarItemDialog` |
-| `ui/graph_items.py` | Renders add buttons; uses callbacks (not signals) because `QGraphicsRectItem` is not a `QObject` |
+| `ui/graph_items.py` | Renders nodes, row dividers, add buttons; callbacks (not signals) because `QGraphicsRectItem` is not a `QObject` |
 | `ui/graph_canvas.py` | Re-emits edit signals from node item callbacks |
 | `ui/main_window.py` | Handles edit signals, shows dialogs, syncs editor |
 
@@ -83,7 +83,7 @@ When programmatically updating the editor after a graph edit, set `_converting =
 | Module | Role |
 |--------|------|
 | `graph/table_data.py` | Discovers arrays, builds relational sections (main + child tables), cell paths |
-| `ui/table_view.py` | Stacked `QTableView` sections, **+ Dataset**, **+ Add row** |
+| `ui/table_view.py` | Stacked `QTableView` sections; **+ Dataset**, **+ Add row**, **+ Add key**; compact height sizing |
 | `ui/main_window.py` | `QStackedWidget` graph/table preview; table edit and add handlers |
 
 **Relational layout:** main table with detected primary key first (`name`), top-level scalars next, then one child table per nested object (`details`, `nutrients`) linked via a read-only FK column.
@@ -95,6 +95,12 @@ When programmatically updating the editor after a graph edit, set `_converting =
 **Add dataset flow:** `AddDatasetDialog` → `add_object_key(data, (), name, [])` for a new top-level array.
 
 **Table edit flow:** double-click cell → `set_value_at_path` → editor refresh.
+
+**Add key flow (child table):** **+ Add key** → `add_key_to_nested_objects_in_array()` → new column on all rows.
+
+**Compact layout:** section widgets use `QSizePolicy.Maximum` vertically; `_fit_table_height()` sizes each `QTableView` to header + rows; sections layout has `AlignTop` + trailing stretch so cards don't expand in the scroll area.
+
+**Graph row dividers:** `_paint_row_dividers()` in `graph_items.py` draws theme `divider` lines between node rows.
 
 **Gotcha:** `_ArrayTableModel` must copy `section.columns` and `section.rows` in `__init__` or tables render empty headers with no data.
 

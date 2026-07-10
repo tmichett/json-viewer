@@ -41,7 +41,8 @@ Supports <b>JSON</b>, <b>YAML</b>, and <b>XML</b>. All processing happens locall
   <li><b>Edit a value</b> — click any scalar row (string, number, boolean, null) on a node to edit it.</li>
 </ul>
 <p><b>Note:</b> The <b>+ / −</b> on the <i>left</i> of a row collapses or expands children.
-The blue <b>+</b> on the <i>right</i> of an array row adds a new item.</p>
+The blue <b>+</b> on the <i>right</i> of an array row adds a new item.
+Rows inside each node are separated by faint horizontal lines.</p>
 
 <h3>Table preview</h3>
 <p>Switch the right pane to a database-style relational view instead of the graph.</p>
@@ -56,6 +57,7 @@ The blue <b>+</b> on the <i>right</i> of an array row adds a new item.</p>
   <li><b>+ Add key</b> — on child tables (<code>details</code>, <code>nutrients</code>), add a new field to every row in that nested object</li>
   <li>In the add-item form, nested groups also have <b>+ Add key</b> for fields not yet in the schema</li>
   <li>Form fields and columns follow <b>JSON key order</b> (e.g. <code>name</code>, <code>color</code>, then nested groups) — not alphabetical</li>
+  <li>Tables are compact — each section sizes to its rows without large empty gaps</li>
   <li>Return to the graph with <b>View → Graph Preview</b> (Ctrl+Shift+G)</li>
 </ul>
 
