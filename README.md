@@ -11,6 +11,9 @@ Desktop graph visualizer for **JSON**, **YAML**, and **XML**, inspired by [JSON 
 - Light and dark themes
 - Zoom, pan, fit-to-view, and focus root node
 - Collapse/expand nested objects and arrays
+- **Graph editing** — add array items via schema-based forms, add object keys, edit scalar values; changes sync to the editor
+- **Table preview** — relational database-style view (main table + linked child tables); **+ Dataset** and **+ Add row**; editable cells sync to editor
+- **Help menu** — Usage guide (F1) and About dialog with application version
 - Search nodes by key or value
 - Format/beautify documents
 - Export graph as PNG or SVG
@@ -52,6 +55,7 @@ On macOS the app bundle is created at `dist/JSON Viewer.app`.
 | [User Guide](docs/USER_GUIDE.md) | Interface tour, workflows, shortcuts, troubleshooting |
 | [Developer Guide](docs/DEVELOPER_GUIDE.md) | Architecture, build, test, packaging |
 | [Docs index](docs/README.md) | Overview and quick links |
+| [Changelog](docs/CHANGELOG.md) | Feature history (`feat-add-items` branch) |
 
 ## Usage
 
@@ -67,13 +71,14 @@ On macOS the app bundle is created at `dist/JSON Viewer.app`.
 | Go to error | F8, or click **Invalid** in the status bar |
 | Fit graph | Cmd/Ctrl+0 |
 | Search nodes | Cmd/Ctrl+F |
+| Graph editing | Click **+** on array rows, **+ Add key** on objects, or click scalar values |
 
 ## Project structure
 
 ```
 src/json_viewer/
   adapters/     # JSON, YAML, XML parse/format
-  graph/        # Parser, layout, collapse logic
+  graph/        # Parser, layout, collapse, data_edit, schema
   ui/           # PyQt6 widgets
   export/       # PNG/SVG export
 ```

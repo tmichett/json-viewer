@@ -10,7 +10,7 @@ json-viewer/
 │   ├── app.py              # QApplication bootstrap
 │   ├── __main__.py         # Entry point (uv run json-viewer)
 │   ├── adapters/           # JSON, YAML, XML parse/format/convert
-│   ├── graph/              # Parser, layout, collapse, sizing
+│   ├── graph/              # Parser, layout, collapse, sizing, data_edit, schema
 │   ├── lint/               # Live validation wrapper
 │   ├── ui/                 # PyQt6 widgets (editor, canvas, menus)
 │   └── export/             # PNG/SVG export
@@ -33,19 +33,76 @@ json-viewer/
 | YAML | PyYAML | `safe_load` / `dump` |
 | XML | defusedxml + ElementTree | Safe parsing; `$attr` prefix convention |
 | Packaging | PyInstaller 6.x | `collect_all('PyQt6')` for Qt deps |
-| Tests | pytest | 28+ tests |
+| Tests | pytest | 59 tests |
 
 ## Architecture
 
 ```
-Editor ──debounce──► adapters.parse_content() ──► graph.parser
-                              │                        │
-                              ▼                        ▼
-                         lint (errors)          graph.layout
-                              │                        │
-                              ▼                        ▼
-                    editor lint markers          GraphCanvas
+Editor ◄──sync──► GraphCanvas (edit signals)
+  │                      │
+  │ debounce             │ callbacks
+  ▼                      ▼
+adapters.parse_content()  graph.parser
+  │                      │
+  ▼                      ▼
+lint (errors)       graph.layout
+  │                      │
+  ▼                      ▼
+editor lint markers   GraphCanvas
 ```
+
+Graph edits flow through `MainWindow`: the canvas emits signals, `data_edit` mutates the parsed Python object, and `format_content` writes the result back to the editor.
+
+### Graph editing
+
+| Module | Role |
+|--------|------|
+| `graph/data_edit.py` | Path-based mutations: `add_array_item`, `add_object_key`, `set_value_at_path` |
+| `graph/schema.py` | Infers field schema from existing array items for the add-item form |
+| `ui/graph_edit_dialog.py` | `AddKeyDialog`, `AddArrayItemDialog`, `EditValueDialog`, `AddScalarItemDialog` |
+| `ui/graph_items.py` | Renders nodes, row dividers, add buttons; callbacks (not signals) because `QGraphicsRectItem` is not a `QObject` |
+| `ui/graph_canvas.py` | Re-emits edit signals from node item callbacks |
+| `ui/main_window.py` | Handles edit signals, shows dialogs, syncs editor |
+
+**Add array item flow:**
+
+1. User clicks **+** on an array row in `NodeGraphicsItem`
+2. `GraphCanvas.add_array_item` signal → `MainWindow._on_graph_add_array_item`
+3. `infer_array_item_schema()` inspects existing items (ignoring empty `{}` entries)
+4. `AddArrayItemDialog` shows a grouped form; `build_object_from_fields()` builds the new dict
+5. `add_array_item(data, path, item)` appends to the array; editor text is reformatted
+
+**Add object key flow:** `AddKeyDialog` → `add_object_key()` → editor sync.
+
+**Edit scalar flow:** `EditValueDialog` → `set_value_at_path()` → editor sync.
+
+When programmatically updating the editor after a graph edit, set `_converting = True` to avoid dirty/lint churn (same pattern as format conversion).
+
+### Table preview
+
+| Module | Role |
+|--------|------|
+| `graph/table_data.py` | Discovers arrays, builds relational sections (main + child tables), cell paths |
+| `ui/table_view.py` | Stacked `QTableView` sections; **+ Dataset**, **+ Add row**, **+ Add key**; compact height sizing |
+| `ui/main_window.py` | `QStackedWidget` graph/table preview; table edit and add handlers |
+
+**Relational layout:** main table with detected primary key first (`name`), top-level scalars next, then one child table per nested object (`details`, `nutrients`) linked via a read-only FK column.
+
+**Field order:** `FieldSchema.child_order` preserves first-seen key order from sample dicts. Used by `AddArrayItemDialog` and `build_relational_tables()` column ordering — never sort alphabetically.
+
+**Add row flow:** `TableView` → `MainWindow._on_table_add_row` → reuses `_add_array_item_at_path()` / `AddArrayItemDialog`.
+
+**Add dataset flow:** `AddDatasetDialog` → `add_object_key(data, (), name, [])` for a new top-level array.
+
+**Table edit flow:** double-click cell → `set_value_at_path` → editor refresh.
+
+**Add key flow (child table):** **+ Add key** → `add_key_to_nested_objects_in_array()` → new column on all rows.
+
+**Compact layout:** section widgets use `QSizePolicy.Maximum` vertically; `_fit_table_height()` sizes each `QTableView` to header + rows; sections layout has `AlignTop` + trailing stretch so cards don't expand in the scroll area.
+
+**Graph row dividers:** `_paint_row_dividers()` in `graph_items.py` draws theme `divider` lines between node rows.
+
+**Gotcha:** `_ArrayTableModel` must copy `section.columns` and `section.rows` in `__init__` or tables render empty headers with no data.
 
 ### Graph parser
 
@@ -128,6 +185,11 @@ Output on macOS: `dist/JSON Viewer.app`
 |-----------|--------|
 | `test_parser.py` | Graph parser, adapters, format conversion, layout |
 | `test_linter.py` | Lint error line/column reporting |
+| `test_data_edit.py` | Path mutations (`add_array_item`, `add_object_key`, `set_value_at_path`) |
+| `test_schema.py` | Schema inference and form-to-object building |
+| `test_graph_items.py` | Graph item helpers (object/array node detection, paths) |
+| `test_table_data.py` | Relational table discovery, column order, cell paths |
+| `test_table_view.py` | Table view widget smoke tests |
 
 Run before committing:
 
